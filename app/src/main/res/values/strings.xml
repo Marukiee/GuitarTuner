@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Guitar Tuner</string>
+    <string name="auto_mode">Auto</string>
+    <string name="tune_up">Tune up</string>
+    <string name="tune_down">Tune down</string>
+    <string name="in_tune">In tune</string>
+    <string name="listening">Play a string…</string>
+    <string name="mic_permission_rationale">The tuner needs microphone access to hear your instrument. Audio never leaves your device.</string>
+    <string name="grant_permission">Grant microphone access</string>
+
+    <!-- Update banner. Dutch on purpose: it mirrors the MarkMySteps banner word for word. -->
+    <string name="update_available">Nieuwe versie beschikbaar</string>
+    <string name="download">Downloaden</string>
+    <string name="hide">Verbergen</string>
+</resources>

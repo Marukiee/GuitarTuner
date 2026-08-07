@@ -1,0 +1,88 @@
+name: Android APK
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # publish the APK as a Release asset
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      # The hosted image does not carry API 37 yet, and compileSdk 37 is required by the
+      # androidx versions this app uses.
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-37 build-tools;37.0.0'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Unit tests
+        run: ./gradlew testDebugUnitTest --no-daemon
+
+      # Decode the signing keystore from a secret when it is configured. Without it we still
+      # build a debug APK so forks and pull requests get something installable, but only a
+      # signed release is published, because only a consistently signed APK can update an
+      # existing install without an uninstall first.
+      - name: Decode keystore
+        id: keystore
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build signed release APK
+        if: steps.keystore.outputs.signed == 'true'
+        env:
+          GT_KEYSTORE_FILE: ${{ runner.temp }}/release.jks
+          GT_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          GT_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          GT_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          GT_VERSION_CODE: ${{ github.run_number }}
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Build debug APK (fallback, unsigned)
+        if: steps.keystore.outputs.signed != 'true'
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: guitartuner-apk
+          path: app/build/outputs/apk/**/*.apk
+          retention-days: 30
+
+      # Stable asset name so the in-app update banner always has a direct download URL:
+      #   https://github.com/Marukiee/GuitarTuner/releases/latest/download/guitartuner.apk
+      - name: Stage APK for release
+        if: steps.keystore.outputs.signed == 'true' && github.ref == 'refs/heads/main'
+        run: |
+          APK=$(find app/build/outputs/apk -name '*-release.apk' | head -1)
+          cp "$APK" "$RUNNER_TEMP/guitartuner.apk"
+
+      # The tag is v<run_number> and versionCode is the same run number. UpdateChecker strips
+      # the "v" and compares the two as integers, so these must stay in lockstep.
+      - name: Publish GitHub Release
+        if: steps.keystore.outputs.signed == 'true' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          name: Build ${{ github.run_number }}
+          body: ${{ github.event.head_commit.message }}
+          make_latest: true
+          files: ${{ runner.temp }}/guitartuner.apk

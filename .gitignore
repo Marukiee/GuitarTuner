@@ -1,0 +1,18 @@
+*.iml
+.gradle/
+local.properties
+.idea/
+.DS_Store
+build/
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+
+# Signing material must never be committed. The keystore lives outside the repo
+# (~/.android/keystores) and CI decodes it from a secret at build time.
+keystore.properties
+*.jks
+*.keystore
+!app/debug.keystore
