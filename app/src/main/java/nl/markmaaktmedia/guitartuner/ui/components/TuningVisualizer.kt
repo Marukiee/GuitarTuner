@@ -30,13 +30,10 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asComposePath
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.graphics.shapes.CornerRounding
 import androidx.graphics.shapes.Morph
 import androidx.graphics.shapes.RoundedPolygon
@@ -53,7 +50,6 @@ import nl.markmaaktmedia.guitartuner.domain.model.TuningReading
 import nl.markmaaktmedia.guitartuner.domain.model.TuningStatus
 import nl.markmaaktmedia.guitartuner.ui.theme.flatAccent
 import nl.markmaaktmedia.guitartuner.ui.theme.sharpAccent
-import kotlin.math.abs
 
 /**
  * The tuning meter: a fixed target line with a morphing bubble that swims towards it.
@@ -149,6 +145,7 @@ fun TuningVisualizer(
                     colors.primary,
                     near,
                 )
+
                 // At rest the bubble is a neutral surface shape. It only takes on the warm or
                 // cool accent once there is actually a note to be warm or cool about.
                 val bubbleColor = lerp(
@@ -240,12 +237,6 @@ private fun LaunchedEffectReading(
     }
 }
 
-/**
- * 1 at the target, 0 at 25 cents out. Deliberately steeper than the meter's own 50 cent span so
- * the in-tune colour is earned rather than being the default half the time.
- */
-private fun closenessOf(cents: Float): Float =
-    (1f - (abs(cents) / 25f)).coerceIn(0f, 1f)
 
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawScale(
     centreX: Float,
@@ -311,19 +302,12 @@ private fun CentsReadout(reading: StateFlow<TuningReading?>) {
     val current by reading.collectAsStateWithLifecycle()
     val cents = current?.cents?.let { Math.round(it) } ?: 0
 
-    val bubble = current?.let {
-        lerp(
-            if (it.cents < 0f) colors.flatAccent else colors.sharpAccent,
-            colors.primary,
-            closenessOf(it.cents),
-        )
-    } ?: colors.surfaceContainerHighest
+    val fill = current?.let { bubbleFill(it.cents, colors) } ?: colors.surfaceContainerHighest
 
     Text(
         text = if (current == null) "" else if (cents > 0) "+$cents" else "$cents",
-        color = if (bubble.luminance() > 0.45f) Color(0xFF10131A) else Color.White,
-        fontSize = 32.sp,
-        fontWeight = FontWeight.Bold,
+        color = contentColorOn(fill),
+        style = MaterialTheme.typography.headlineMedium,
         textAlign = TextAlign.Center,
     )
 }

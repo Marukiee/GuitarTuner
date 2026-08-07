@@ -44,12 +44,18 @@ private val FallbackDark = darkColorScheme(
  * that any scheme role is warm or cool, and the whole point of the gradient is that flat reads as
  * warm and sharp reads as cool regardless of wallpaper. Only the in-tune colour comes from the
  * scheme, which is where the wallpaper shows up.
+ *
+ * They follow the scheme's *polarity* though, and that part is not cosmetic. In a light scheme
+ * `primary` is a dark tone with white `onPrimary`; in a dark scheme it is a light tone with dark
+ * `onPrimary`. If these accents did not match, the cents readout would be white on a pale bubble
+ * for half the meter's range. They are also darker (light theme) and lighter (dark theme) than
+ * the first attempt, which was legible in principle and marginal in the hand.
  */
 val ColorScheme.flatAccent: Color
-    get() = if (isLight) Color(0xFFD2601A) else Color(0xFFFF9F5A)
+    get() = if (isLight) Color(0xFFB54708) else Color(0xFFFFBE85)
 
 val ColorScheme.sharpAccent: Color
-    get() = if (isLight) Color(0xFF1A6FD2) else Color(0xFF67B4FF)
+    get() = if (isLight) Color(0xFF14479E) else Color(0xFF9CC6FF)
 
 /** A scheme is light when its surface is bright; there is no flag on ColorScheme itself. */
 private val ColorScheme.isLight: Boolean
@@ -79,7 +85,7 @@ fun GuitarTunerTheme(
 
     MaterialTheme(
         colorScheme = colorScheme,
-        // MaterialTheme.typography already carries the expressive type scale in material3 1.4+.
+        typography = GuitarTunerTypography,
         content = content,
     )
 }

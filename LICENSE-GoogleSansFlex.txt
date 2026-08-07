@@ -1,0 +1,12 @@
+Google Sans Flex is distributed under the SIL Open Font License, Version 1.1.
+
+Copyright 2024 Google LLC
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+This license is available with a FAQ at: https://openfontlicense.org
+
+The three font files in app/src/main/res/font (google_sans_flex_regular.ttf,
+google_sans_flex_medium.ttf, google_sans_flex_bold.ttf) are static instances
+of the Google Sans Flex variable font, obtained from Google Fonts.
+
+Full licence text: https://openfontlicense.org/open-font-license-official-text/

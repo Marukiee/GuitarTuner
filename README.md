@@ -109,6 +109,13 @@ The bubble itself morphs between an eight point cookie and a circle using `andro
 it locks on. The only thing that genuinely recomposes is the cents readout, isolated in its own
 composable and rounded to whole cents so it settles rather than flickers.
 
+### Typography
+
+Google Sans Flex, bundled as three static instances rather than pulled through the
+downloadable-fonts provider. It is on Google Fonts under the OFL (see
+`LICENSE-GoogleSansFlex.txt`), the three weights come to 384 KB, and bundling means no dependency
+on Play Services and no first-frame flash while a font request resolves.
+
 ### Supported instruments
 
 Acoustic and electric six string, seven string, four and five string bass, ukulele. Tunings are

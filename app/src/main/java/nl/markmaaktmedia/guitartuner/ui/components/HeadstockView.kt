@@ -47,14 +47,20 @@ private data class PegSlot(
 /**
  * Deals the strings out over the two sides of the headstock.
  *
- * The ordering is the real thing, not the obvious thing. On a machine head the post furthest from
- * the nut carries the string that has furthest to travel, so:
+ * The rule is set by the one constraint a real headstock has: **the strings must not cross.**
  *
- * - the bass side runs low to high going **away** from the nut, which with the nut at the bottom
- *   of the component means the lowest string sits at the top;
- * - the treble side is mirrored, so the high E sits at the top and the G nearest the nut;
- * - an inline headstock is the treble case for every string: the low E post is the one closest to
- *   the nut, so the whole column reads high to low from the top down.
+ * At the nut the low E is the outermost string on the bass side. If it ran to the post at the tip
+ * it would have to cut across every string inboard of it, so it goes to the post *nearest* the
+ * nut, and the innermost string of that group (the D on a six string) travels furthest, to the
+ * tip. With the nut at the bottom of this component that reads D, A, E from the top down. The
+ * treble side mirrors it: the high E is outermost, so it takes the nearest post, and the G runs
+ * to the tip, giving G, B, E from the top.
+ *
+ * An inline headstock is the same case with every post on the bass side: low E nearest the nut,
+ * high E at the tip.
+ *
+ * So: the left column is always reversed against string order, the right column never is. An
+ * earlier version had both backwards, which any guitarist spots instantly.
  */
 private fun slotsFor(instrument: Instrument): List<PegSlot> {
     val count = instrument.stringCount
@@ -65,15 +71,12 @@ private fun slotsFor(instrument: Instrument): List<PegSlot> {
         HeadstockLayout.TWO_PER_SIDE -> count / 2
     }
     val rightCount = count - leftCount
-    val inline = instrument.layout == HeadstockLayout.INLINE
 
     return List(count) { index ->
         if (index < leftCount) {
-            val slot = if (inline) leftCount - 1 - index else index
-            PegSlot(index, Side.LEFT, slot, leftCount)
+            PegSlot(index, Side.LEFT, leftCount - 1 - index, leftCount)
         } else {
-            val onSide = index - leftCount
-            PegSlot(index, Side.RIGHT, rightCount - 1 - onSide, rightCount)
+            PegSlot(index, Side.RIGHT, index - leftCount, rightCount)
         }
     }
 }

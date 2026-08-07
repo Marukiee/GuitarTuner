@@ -1,30 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- An eighth note as a bare stroked outline, matching the MarkMySteps compass mark:
-     same weight, same rounded caps, same accent. The group scales a 24 unit drawing
-     into the 66dp safe zone of a 108dp adaptive icon. -->
+<!--
+  An eighth note, matched to the MarkMySteps compass mark so the two read as one family.
+
+  The numbers are measured, not guessed. That icon's foreground is 432px at xxxhdpi, its artwork
+  is a 153px square dead centre, and its stroke is 29.5px. Scaled into this 108 unit viewport
+  that is a 38 unit mark with a 7.4 unit stroke. The first version here was 6.05 units, which is
+  18 percent thinner, and its artwork was off centre by about a unit.
+
+  Everything below is in final viewport units so the centring can be read off directly: the
+  visible bounds, half strokes and round caps included, run 36.9..71.1 across and 34.4..73.6
+  down. Both centre on 54.
+
+  The head is filled rather than stroked. A hollow head is a half note.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <group
-        android:translateX="21"
-        android:translateY="21"
-        android:scaleX="2.75"
-        android:scaleY="2.75">
-        <!-- Note head. -->
-        <path
-            android:pathData="M8,17.6 m-3.9,0 a3.9,3.9 0 1,0 7.8,0 a3.9,3.9 0 1,0 -7.8,0"
-            android:strokeColor="#E8613C"
-            android:strokeWidth="2.2"
-            android:strokeLineCap="round"
-            android:strokeLineJoin="round" />
-        <!-- Stem and flag in one stroke. -->
-        <path
-            android:pathData="M11.9,17.6 L11.9,4.6 C16.1,5.8 18.3,8.5 18,12"
-            android:strokeColor="#E8613C"
-            android:strokeWidth="2.2"
-            android:strokeLineCap="round"
-            android:strokeLineJoin="round" />
-    </group>
+    <!-- Note head. -->
+    <path
+        android:pathData="M45.9,64.6 m-9,0 a9,9 0 1,0 18,0 a9,9 0 1,0 -18,0"
+        android:fillColor="#E8613C" />
+    <!-- Stem and flag in one stroke. -->
+    <path
+        android:pathData="M54.4,64.6 L54.4,38.1 C61.5,39.5 66.5,43.5 67.4,50.1"
+        android:strokeColor="#E8613C"
+        android:strokeWidth="7.4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
 </vector>
