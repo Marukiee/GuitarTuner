@@ -40,12 +40,11 @@ resolution from one whole sample of lag (about 13 cents at E4) to well under one
 ### Audio capture
 
 `audio/AudioCaptureSource.kt` opens `AudioRecord` with `ENCODING_PCM_FLOAT` at 44.1 kHz and
-prefers, in order, `UNPROCESSED`, then `VOICE_RECOGNITION`, then `MIC`. It additionally disables
-`AutomaticGainControl`, `NoiseSuppressor` and `AcousticEchoCanceler` on its own session.
+disables `AutomaticGainControl`, `NoiseSuppressor` and `AcousticEchoCanceler` on its own session.
 
-This matters more than the algorithm does. The default `MIC` source runs through the platform
-voice pipeline on most phones, and AGC alone will shift a reading by several cents and cut a
-decaying note short.
+This matters more than the algorithm does: the platform voice pipeline is on by default, and AGC
+alone will shift a reading by several cents and cut a decaying note short. Which capture source
+is opened is a separate question, covered under [Microphone selection](#microphone-selection).
 
 Windows are 8192 samples (186 ms, enough periods for a five string bass B0 at 30.87 Hz) advancing
 by 2048 samples, so the UI updates about 21 times a second.
