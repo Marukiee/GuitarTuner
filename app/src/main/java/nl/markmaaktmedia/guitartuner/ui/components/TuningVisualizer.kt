@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Matrix
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asComposePath
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
@@ -84,8 +85,9 @@ fun TuningVisualizer(
     val offset = remember { Animatable(0f) }
     // 0 = far from the target, 1 = dead on. Drives colour, shape and rotation together.
     val closeness = remember { Animatable(0f) }
-    // 0 = nothing is being heard, 1 = a note is present. Fades the bubble in and out.
-    val presence = remember { Animatable(0f) }
+    // IDLE_PRESENCE = nothing is being heard, 1 = a note is present. It never reaches 0: an
+    // empty meter with a lone hairline in it looks broken rather than idle.
+    val presence = remember { Animatable(IDLE_PRESENCE) }
 
     LaunchedEffectReading(reading, offset, closeness, presence)
 
@@ -119,15 +121,20 @@ fun TuningVisualizer(
         ) {
             Canvas(Modifier.fillMaxSize()) {
                 val centreX = size.width / 2f
-                val centreY = size.height / 2f
-                val bubbleRadius = with(density) { 58.dp.toPx() }
-                val travel = centreX - bubbleRadius - with(density) { 12.dp.toPx() }
+                val bubbleRadius = with(density) { 52.dp.toPx() }
+                val tickGap = with(density) { 28.dp.toPx() }
+                // The bubble sits above the scale rather than in the middle of a tall empty box:
+                // the two have to read as one instrument, not as two unrelated graphics.
+                val centreY = (size.height - tickGap) / 2f
+                val travel = centreX - bubbleRadius - with(density) { 10.dp.toPx() }
 
                 drawScale(
                     centreX = centreX,
-                    centreY = centreY,
+                    tickY = centreY + bubbleRadius + tickGap,
+                    lineTop = centreY - bubbleRadius - with(density) { 20.dp.toPx() },
                     travel = travel,
-                    tickColor = colors.onSurfaceVariant.copy(alpha = 0.35f),
+                    tickColor = colors.onSurfaceVariant.copy(alpha = 0.38f),
+                    trackColor = colors.onSurfaceVariant.copy(alpha = 0.12f),
                     targetColor = colors.primary,
                     density = density,
                 )
@@ -135,12 +142,18 @@ fun TuningVisualizer(
                 val here = offset.value
                 val near = closeness.value
                 val alpha = presence.value
-                if (alpha <= 0.01f) return@Canvas
 
-                val bubbleColor = lerp(
+                val live = lerp(
                     if (here < 0f) colors.flatAccent else colors.sharpAccent,
                     colors.primary,
                     near,
+                )
+                // At rest the bubble is a neutral surface shape. It only takes on the warm or
+                // cool accent once there is actually a note to be warm or cool about.
+                val bubbleColor = lerp(
+                    colors.surfaceContainerHighest,
+                    live,
+                    ((alpha - IDLE_PRESENCE) / (1f - IDLE_PRESENCE)).coerceIn(0f, 1f),
                 )
 
                 // Off target the bubble is a slowly turning cookie; on target it settles into a
@@ -155,7 +168,7 @@ fun TuningVisualizer(
                     },
                 )
 
-                drawPath(path, bubbleColor.copy(alpha = alpha))
+                drawPath(path, bubbleColor)
             }
 
             // The readout rides along with the bubble. translationX is a draw-phase property, so
@@ -165,7 +178,8 @@ fun TuningVisualizer(
                 modifier = Modifier.graphicsLayer {
                     val travel = size.width / 2f - with(density) { 70.dp.toPx() }
                     translationX = offset.value * travel
-                    alpha = presence.value
+                    // Fade the number out entirely at rest; a "0" with nothing playing is a lie.
+                    alpha = ((presence.value - IDLE_PRESENCE) / (1f - IDLE_PRESENCE)).coerceIn(0f, 1f)
                 },
             ) {
                 CentsReadout(reading)
@@ -191,7 +205,7 @@ private fun LaunchedEffectReading(
         reading.collectLatest { current ->
             if (current == null) {
                 coroutineScope {
-                    launch { presence.animateTo(0f, tween(350)) }
+                    launch { presence.animateTo(IDLE_PRESENCE, tween(350)) }
                     launch { closeness.animateTo(0f, spring(stiffness = Spring.StiffnessLow)) }
                 }
                 return@collectLatest
@@ -234,15 +248,25 @@ private fun closenessOf(cents: Float): Float =
 
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawScale(
     centreX: Float,
-    centreY: Float,
+    tickY: Float,
+    lineTop: Float,
     travel: Float,
     tickColor: Color,
+    trackColor: Color,
     targetColor: Color,
     density: androidx.compose.ui.unit.Density,
 ) {
-    val minorHeight = with(density) { 10.dp.toPx() }
-    val majorHeight = with(density) { 18.dp.toPx() }
-    val tickY = centreY + with(density) { 96.dp.toPx() }
+    val minorHeight = with(density) { 9.dp.toPx() }
+    val majorHeight = with(density) { 17.dp.toPx() }
+
+    // A baseline under the ticks, so the scale reads as one object instead of loose marks.
+    drawLine(
+        color = trackColor,
+        start = Offset(centreX - travel, tickY),
+        end = Offset(centreX + travel, tickY),
+        strokeWidth = with(density) { 2.dp.toPx() },
+        cap = StrokeCap.Round,
+    )
 
     for (cents in -50..50 step 5) {
         if (cents == 0) continue
@@ -254,17 +278,22 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawScale(
             start = Offset(x, tickY - half),
             end = Offset(x, tickY + half),
             strokeWidth = with(density) { (if (major) 2.5f else 1.5f).dp.toPx() },
+            cap = StrokeCap.Round,
         )
     }
 
-    // The target line runs the full height of the meter so the bubble visibly crosses it.
+    // The target line spans the bubble and the scale so the bubble visibly crosses it.
     drawLine(
         color = targetColor,
-        start = Offset(centreX, centreY - with(density) { 86.dp.toPx() }),
+        start = Offset(centreX, lineTop),
         end = Offset(centreX, tickY + majorHeight),
-        strokeWidth = with(density) { 3.dp.toPx() },
+        strokeWidth = with(density) { 4.dp.toPx() },
+        cap = StrokeCap.Round,
     )
 }
+
+/** How present the bubble is when nothing is playing. */
+private const val IDLE_PRESENCE = 0.34f
 
 /**
  * The one part that really recomposes. Rounding to whole cents means it changes a few times a

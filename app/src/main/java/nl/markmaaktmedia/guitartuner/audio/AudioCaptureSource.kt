@@ -2,6 +2,7 @@ package nl.markmaaktmedia.guitartuner.audio
 
 import android.Manifest
 import android.content.Context
+import android.media.AudioDeviceInfo
 import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioRecord
@@ -22,15 +23,36 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
+ * Which capture path to open.
+ *
+ * This is not a cosmetic setting. On most phones the audio source decides *which physical
+ * microphone* the recorder is wired to, and they are not interchangeable:
+ *
+ * - [Unprocessed] and [VoiceRecognition] usually select a secondary mic, often the one next to
+ *   the rear camera, because that is the one furthest from the earpiece.
+ * - [Main] is the primary mic, the one beside the USB-C port at the bottom.
+ * - [Camcorder] is explicitly the rear-facing mic.
+ *
+ * [Unprocessed] is the best choice for a tuner when it works, because it is the only source
+ * guaranteed to bypass the platform's gain and noise processing. But "best" is worthless on a
+ * handset whose rear mic is dead, which is why the engine falls back through this list rather
+ * than committing to one.
+ */
+enum class MicSource(val label: String, val androidSource: Int) {
+    Unprocessed("Unprocessed", MediaRecorder.AudioSource.UNPROCESSED),
+    VoiceRecognition("Voice rec.", MediaRecorder.AudioSource.VOICE_RECOGNITION),
+    Main("Main mic", MediaRecorder.AudioSource.MIC),
+    Camcorder("Rear mic", MediaRecorder.AudioSource.CAMCORDER),
+}
+
+/**
  * Microphone capture as a cold [Flow] of overlapping analysis windows.
  *
  * Design notes that matter for tuning accuracy:
  *
- * - **Audio source.** `MIC` routes through the platform voice pipeline on most devices, which
- *   applies AGC and noise suppression. Both mangle the waveform enough to shift the detected
- *   pitch by several cents and to kill a decaying note early. We prefer `UNPROCESSED` when the
- *   device advertises it, fall back to `VOICE_RECOGNITION` (AGC off on nearly all OEMs) and only
- *   then to `MIC`. The effect handles are additionally disabled by hand below.
+ * - **Voice processing off.** AGC and noise suppression mangle the waveform enough to shift the
+ *   detected pitch by several cents and to cut a decaying note short, so the effect handles are
+ *   disabled by hand on our own session.
  * - **PCM float.** Reading `ENCODING_PCM_FLOAT` avoids a short-to-float conversion pass and gives
  *   headroom on loud pick attacks.
  * - **Overlap.** Windows are [windowSize] long but advance by [hopSize], so the UI updates every
@@ -44,8 +66,20 @@ class AudioCaptureSource(
     val hopSize: Int = DEFAULT_HOP_SIZE,
 ) {
 
+    private val audioManager: AudioManager? = context.getSystemService(AudioManager::class.java)
+
+    /** Sources worth trying on this device, best first. */
+    fun availableSources(): List<MicSource> = buildList {
+        if (audioManager?.getProperty(AudioManager.PROPERTY_SUPPORT_AUDIO_SOURCE_UNPROCESSED) == "true") {
+            add(MicSource.Unprocessed)
+        }
+        add(MicSource.VoiceRecognition)
+        add(MicSource.Main)
+        add(MicSource.Camcorder)
+    }
+
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
-    fun windows(): Flow<FloatArray> = callbackFlow {
+    fun windows(source: MicSource): Flow<FloatArray> = callbackFlow {
         val minBuffer = AudioRecord.getMinBufferSize(
             sampleRate,
             AudioFormat.CHANNEL_IN_MONO,
@@ -53,19 +87,21 @@ class AudioCaptureSource(
         )
         check(minBuffer > 0) { "AudioRecord.getMinBufferSize failed: $minBuffer" }
 
-        // Four hops of slack so a scheduling hiccup does not drop samples.
         val bufferBytes = maxOf(minBuffer, windowSize * BYTES_PER_FLOAT * 2)
 
         val record = AudioRecord(
-            preferredAudioSource(),
+            source.androidSource,
             sampleRate,
             AudioFormat.CHANNEL_IN_MONO,
             AudioFormat.ENCODING_PCM_FLOAT,
             bufferBytes,
         )
         check(record.state == AudioRecord.STATE_INITIALIZED) {
-            "AudioRecord failed to initialise"
+            "AudioRecord failed to initialise for ${source.label}"
         }
+
+        // A plugged-in USB or wired mic should always win over anything built in.
+        preferredInputDevice()?.let { record.preferredDevice = it }
 
         val effects = disableVoiceProcessing(record.audioSessionId)
         record.startRecording()
@@ -105,14 +141,16 @@ class AudioCaptureSource(
         .buffer(capacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
         .flowOn(Dispatchers.IO)
 
-    private fun preferredAudioSource(): Int {
-        val audioManager = context.getSystemService(AudioManager::class.java)
-        val unprocessedSupported =
-            audioManager?.getProperty(AudioManager.PROPERTY_SUPPORT_AUDIO_SOURCE_UNPROCESSED) == "true"
-        return when {
-            unprocessedSupported -> MediaRecorder.AudioSource.UNPROCESSED
-            else -> MediaRecorder.AudioSource.VOICE_RECOGNITION
-        }
+    /**
+     * External inputs beat built-in ones. Beyond that we do not try to pick a specific built-in
+     * mic: Android exposes all of them behind a single [AudioDeviceInfo.TYPE_BUILTIN_MIC] entry,
+     * so the only lever that actually changes which capsule is used is the audio source.
+     */
+    private fun preferredInputDevice(): AudioDeviceInfo? {
+        val devices = audioManager?.getDevices(AudioManager.GET_DEVICES_INPUTS) ?: return null
+        return devices.firstOrNull {
+            it.type == AudioDeviceInfo.TYPE_USB_DEVICE || it.type == AudioDeviceInfo.TYPE_USB_HEADSET
+        } ?: devices.firstOrNull { it.type == AudioDeviceInfo.TYPE_WIRED_HEADSET }
     }
 
     /**

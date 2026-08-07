@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import nl.markmaaktmedia.guitartuner.audio.AudioCaptureSource
 import nl.markmaaktmedia.guitartuner.audio.McLeodPitchDetector
+import nl.markmaaktmedia.guitartuner.audio.MicSource
 import nl.markmaaktmedia.guitartuner.audio.PitchEngine
 import nl.markmaaktmedia.guitartuner.domain.InTuneTracker
 import nl.markmaaktmedia.guitartuner.domain.StringMatcher
@@ -28,15 +29,14 @@ import nl.markmaaktmedia.guitartuner.domain.model.TunerUiState
 import nl.markmaaktmedia.guitartuner.domain.model.TuningReading
 
 /**
- * The state is deliberately split in two.
+ * The state is deliberately split in three.
  *
  * [uiState] changes only when the user does something: pick an instrument, flip auto mode, tap a
  * peg. Composables reading it recompose a handful of times per session.
  *
- * [reading] changes about 21 times a second. Anything reading it recomposes 21 times a second,
- * which is why the visualizer must consume it through an `Animatable` inside a `graphicsLayer`
- * or `Canvas` lambda: that keeps the audio rate confined to the draw phase and never triggers
- * recomposition or relayout at all.
+ * [reading] and [inputLevelDb] change about 21 times a second. Anything reading them recomposes
+ * 21 times a second, which is why the visualizer must consume them through an `Animatable` inside
+ * a `graphicsLayer` or `Canvas` lambda: that keeps the audio rate confined to the draw phase.
  *
  * [events] carries the one shot stuff (haptics, chime) that must fire exactly once.
  */
@@ -49,16 +49,30 @@ class TunerViewModel(application: Application) : AndroidViewModel(application) {
     private val matcher = StringMatcher()
     private val inTuneTracker = InTuneTracker()
 
-    private val _uiState = MutableStateFlow(TunerUiState())
+    private val sourceCandidates = engine.availableSources()
+
+    private val _uiState = MutableStateFlow(
+        TunerUiState(micSource = sourceCandidates.first()),
+    )
     val uiState: StateFlow<TunerUiState> = _uiState.asStateFlow()
 
     private val _reading = MutableStateFlow<TuningReading?>(null)
     val reading: StateFlow<TuningReading?> = _reading.asStateFlow()
 
+    /** Raw input level in dBFS, so the UI can prove that audio is arriving at all. */
+    private val _inputLevelDb = MutableStateFlow(SILENCE_DB)
+    val inputLevelDb: StateFlow<Float> = _inputLevelDb.asStateFlow()
+
     private val _events = MutableSharedFlow<TunerEvent>(extraBufferCapacity = 4)
     val events: SharedFlow<TunerEvent> = _events.asSharedFlow()
 
     private var listenJob: Job? = null
+
+    /** Frames in a row that carried effectively nothing. Drives the dead-microphone fallback. */
+    private var silentFrames = 0
+
+    /** Once a source has actually delivered signal we stop second-guessing it. */
+    private var sourceProven = false
 
     init {
         engine.configureFor(_uiState.value.instrument)
@@ -101,6 +115,21 @@ class TunerViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update { it.copy(referenceHz = hz.coerceIn(400f, 480f)) }
     }
 
+    /**
+     * Step to the next capture path by hand.
+     *
+     * Needed because the automatic fallback can only react to *silence*, and a microphone can be
+     * wrong without being silent: a rear mic picking up a muffled room still produces a level, it
+     * just produces a useless one. Pinning also stops the fallback from wandering off the source
+     * the user picked.
+     */
+    fun cycleMicSource() {
+        val current = sourceCandidates.indexOf(_uiState.value.micSource)
+        val next = sourceCandidates[(current + 1) % sourceCandidates.size]
+        _uiState.update { it.copy(micSource = next, micSourcePinned = true) }
+        restartListening()
+    }
+
     fun onPermissionResult(state: MicPermissionState) {
         _uiState.update { it.copy(micPermission = state) }
     }
@@ -122,9 +151,14 @@ class TunerViewModel(application: Application) : AndroidViewModel(application) {
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     fun startListening() {
         if (listenJob?.isActive == true) return
+        silentFrames = 0
         _uiState.update { it.copy(isListening = true) }
         listenJob = viewModelScope.launch {
-            engine.readings().collect { pitch ->
+            engine.frames(_uiState.value.micSource).collect { frame ->
+                _inputLevelDb.value = frame.levelDb
+                watchForDeadMicrophone(frame.levelDb)
+
+                val pitch = frame.pitch
                 if (pitch == null) {
                     _reading.value = null
                     inTuneTracker.update(null, SystemClock.elapsedRealtime())
@@ -140,7 +174,48 @@ class TunerViewModel(application: Application) : AndroidViewModel(application) {
         listenJob = null
         inTuneTracker.reset()
         _reading.value = null
+        _inputLevelDb.value = SILENCE_DB
         _uiState.update { it.copy(isListening = false) }
+    }
+
+    @Suppress("MissingPermission")
+    private fun restartListening() {
+        if (_uiState.value.micPermission != MicPermissionState.Granted) return
+        stopListening()
+        startListening()
+    }
+
+    /**
+     * Rotates to the next capture path when the current one delivers nothing at all.
+     *
+     * A handset can have a physically broken microphone, and the sources this app prefers for
+     * accuracy are exactly the ones that tend to select a secondary capsule. Without this the app
+     * looks merely unresponsive, which is a miserable thing to debug from the outside.
+     *
+     * The threshold is well below room tone, so a quiet room does not trigger it. Once any frame
+     * clears it the source is considered proven and we stop rotating for the rest of the session.
+     */
+    private fun watchForDeadMicrophone(levelDb: Float) {
+        if (sourceProven || _uiState.value.micSourcePinned) return
+
+        if (levelDb > DEAD_MIC_DB) {
+            sourceProven = true
+            silentFrames = 0
+            return
+        }
+
+        silentFrames++
+        if (silentFrames < DEAD_MIC_FRAMES) return
+
+        val current = sourceCandidates.indexOf(_uiState.value.micSource)
+        if (current == sourceCandidates.lastIndex) {
+            // Everything has been tried. Stop cycling; the input meter will show a flat line and
+            // the user can take it from there.
+            sourceProven = true
+            return
+        }
+        _uiState.update { it.copy(micSource = sourceCandidates[current + 1]) }
+        restartListening()
     }
 
     // endregion
@@ -221,5 +296,15 @@ class TunerViewModel(application: Application) : AndroidViewModel(application) {
     override fun onCleared() {
         stopListening()
         super.onCleared()
+    }
+
+    private companion object {
+        const val SILENCE_DB = -120f
+
+        /** Below this there is genuinely nothing on the wire; room tone sits well above it. */
+        const val DEAD_MIC_DB = -75f
+
+        /** ~2 seconds at a 46 ms hop before giving up on a capture path. */
+        const val DEAD_MIC_FRAMES = 44
     }
 }

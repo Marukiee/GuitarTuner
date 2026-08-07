@@ -1,6 +1,7 @@
 package nl.markmaaktmedia.guitartuner.domain.model
 
 import androidx.compose.runtime.Immutable
+import nl.markmaaktmedia.guitartuner.audio.MicSource
 import kotlin.math.abs
 
 /** Raw output of the pitch detector for one analysis window. Emitted at ~20 Hz. */
@@ -71,6 +72,10 @@ data class TunerUiState(
     val referenceHz: Float = Note.STANDARD_REFERENCE_HZ,
     val micPermission: MicPermissionState = MicPermissionState.Unknown,
     val isListening: Boolean = false,
+    /** Which capture path is live. Rotates automatically when one turns out to be dead. */
+    val micSource: MicSource = MicSource.Main,
+    /** True once the user has chosen a source by hand, which stops the automatic fallback. */
+    val micSourcePinned: Boolean = false,
 ) {
     val activeString: TuningString
         get() = instrument.strings.getOrElse(activeStringIndex) { instrument.strings.first() }
