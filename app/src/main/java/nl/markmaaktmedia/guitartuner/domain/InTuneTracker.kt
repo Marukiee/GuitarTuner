@@ -6,16 +6,26 @@ import nl.markmaaktmedia.guitartuner.domain.model.TuningStatus
 /**
  * Debounces the "held in tune" condition that triggers the chime, the haptic and auto-advance.
  *
- * The rule is: the reading must stay inside the in-tune window continuously for [holdMillis].
- * A single frame outside the window resets the clock, so a wobbling note cannot accumulate
- * credit across dropouts. [reset] is called whenever the target string changes.
+ * The rule is: the reading must stay inside the in-tune window for [holdMillis], tolerating up
+ * to [graceFrames] frames outside it before the clock restarts. [reset] is called whenever the
+ * target string changes.
  */
 class InTuneTracker(
     private val holdMillis: Long = 500L,
-    private val minClarity: Float = 0.9f,
+    private val minClarity: Float = 0.82f,
+    /**
+     * Frames outside the window that are tolerated before the clock restarts.
+     *
+     * Zero tolerance sounds right and is unusable: a plucked string wobbles for the first few
+     * hundred milliseconds and the detector drops the odd frame as the note decays, so a strict
+     * reset means the hold almost never completes. Three frames is about 140 ms at a 46 ms hop,
+     * short enough that a genuinely out-of-tune string still resets.
+     */
+    private val graceFrames: Int = 3,
 ) {
     private var heldSinceMillis: Long = NOT_HELD
     private var alreadyFired = false
+    private var missedFrames = 0
 
     /**
      * @return true exactly once per continuous in-tune stretch, on the frame where the hold
@@ -27,10 +37,14 @@ class InTuneTracker(
             reading.clarity >= minClarity
 
         if (!qualifies) {
-            heldSinceMillis = NOT_HELD
-            alreadyFired = false
+            missedFrames++
+            if (missedFrames > graceFrames) {
+                heldSinceMillis = NOT_HELD
+                alreadyFired = false
+            }
             return false
         }
+        missedFrames = 0
 
         if (heldSinceMillis == NOT_HELD) {
             heldSinceMillis = nowMillis
@@ -53,6 +67,7 @@ class InTuneTracker(
     fun reset() {
         heldSinceMillis = NOT_HELD
         alreadyFired = false
+        missedFrames = 0
     }
 
     private companion object {

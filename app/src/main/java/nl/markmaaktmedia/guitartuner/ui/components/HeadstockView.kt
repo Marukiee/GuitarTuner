@@ -52,8 +52,7 @@ private data class PegSlot(
  *
  * - the bass side runs low to high going **away** from the nut, which with the nut at the bottom
  *   of the component means the lowest string sits at the top;
- * - the treble side is mirrored, so the high E sits at the top and the G nearest the nut. Getting
- *   this backwards is immediately obvious to anyone who has ever restrung a guitar;
+ * - the treble side is mirrored, so the high E sits at the top and the G nearest the nut;
  * - an inline headstock is the treble case for every string: the low E post is the one closest to
  *   the nut, so the whole column reads high to low from the top down.
  */
@@ -70,7 +69,6 @@ private fun slotsFor(instrument: Instrument): List<PegSlot> {
 
     return List(count) { index ->
         if (index < leftCount) {
-            // Inline headstocks put the low E nearest the nut, so the column is reversed.
             val slot = if (inline) leftCount - 1 - index else index
             PegSlot(index, Side.LEFT, slot, leftCount)
         } else {
@@ -83,18 +81,21 @@ private fun slotsFor(instrument: Instrument): List<PegSlot> {
 /**
  * A flat Material You headstock that reshapes itself for the selected instrument.
  *
- * Nothing here is photorealistic. The body is one filled path in a surface container role, the
- * strings are hairlines, and the only saturated colour in the whole component is the peg the
- * tuner is currently listening for.
+ * ## What changed, and why the first two attempts looked wrong
  *
- * Two things that were wrong the first time and are worth stating:
+ * Everything is now **proportional to the space available** rather than a set of fixed dp values.
+ * Fixed sizes are what made the neck look like a drinking straw: a 60dp neck is fine under a
+ * 116dp headstock and absurd on a 400dp-wide phone, and it could not adapt when six inline pegs
+ * needed twice the vertical room three-per-side pegs do.
  *
- * - The strings run the **full height** of the component. They come up the fretboard evenly
- *   spaced, cross the nut, and only then fan out to their posts. Stopping them at the nut made
- *   the instrument look cut in half.
- * - The peg buttons straddle the edge of the body rather than floating beside it, and each
- *   string terminates underneath its own button. A post drawn somewhere in the middle of the
- *   body has no visible relationship to the button that controls it.
+ * The peg band also stops well short of the nut. Spreading pegs over the full height put the
+ * bottom pair right on top of the nut, where no machine head has ever been, and left the top of
+ * the headstock empty. Pegs now live in the upper 74% of the body, which is where they are on a
+ * real instrument and reads far better.
+ *
+ * Strings run the full height of the component: up the fretboard, across the nut, then fanning
+ * out to their posts. The peg buttons straddle the body edge so each string visibly terminates
+ * under the control that tightens it.
  */
 @Composable
 fun HeadstockView(
@@ -106,36 +107,42 @@ fun HeadstockView(
 ) {
     val colors = MaterialTheme.colorScheme
     val slots = remember(instrument) { slotsFor(instrument) }
-    val hasLeft = slots.any { it.side == Side.LEFT }
     val hasRight = slots.any { it.side == Side.RIGHT }
     val busiestSide = slots.maxOf { it.slotsOnSide }
 
     BoxWithConstraints(modifier) {
         val height = maxHeight
-        val centreX = maxWidth / 2f
+        val width = maxWidth
+        val centreX = width / 2f
 
-        // Everything below the nut is fretboard. It has to be tall enough to read as a neck
-        // rather than a stub, but the pegs need the lion's share.
-        val fretboardHeight = (height * 0.22f).coerceIn(48.dp, 110.dp)
+        // Proportional geometry. The neck is a real neck: over a third of the body width, which
+        // is roughly the ratio on an actual guitar and the thing that was most obviously wrong.
+        val bodyHalf = (width * 0.20f).coerceIn(56.dp, 108.dp)
+        val narrowHalf = bodyHalf * 0.42f
+        val neckHalf = bodyHalf * 0.62f
+
+        val leftHalf = bodyHalf
+        val rightHalf = if (hasRight) bodyHalf else narrowHalf
+
+        val fretboardHeight = (height * 0.20f).coerceIn(44.dp, 96.dp)
         val nutY = height - fretboardHeight
-        val topInset = 10.dp
+        val bodyTop = 8.dp
 
-        // A six-in-a-line headstock has twice as many slots down one side as a three-per-side
-        // one, so a fixed peg size overlaps. Size the peg to the space it actually has.
-        val band = nutY - topInset
-        val pegSize = (band / busiestSide * 0.76f).coerceIn(34.dp, 54.dp)
+        // Pegs occupy the upper part of the body only. The gap above the nut is what stops the
+        // lowest pair from sitting on the nut itself.
+        val bandTop = bodyTop + height * 0.06f
+        val bandBottom = nutY - (nutY - bodyTop) * 0.20f
+        val band = bandBottom - bandTop
 
-        val bodyHalfWide = 58.dp
-        val bodyHalfNarrow = 24.dp
-        val leftHalf = if (hasLeft) bodyHalfWide else bodyHalfNarrow
-        val rightHalf = if (hasRight) bodyHalfWide else bodyHalfNarrow
-        val neckHalf = 30.dp
+        val pegSize = (band / busiestSide * 0.82f).coerceIn(34.dp, 56.dp)
 
         fun slotY(slot: PegSlot): Dp =
-            topInset + pegSize / 2f +
-                (band - pegSize) * (slot.slot.toFloat() / (slot.slotsOnSide - 1).coerceAtLeast(1))
+            if (slot.slotsOnSide <= 1) {
+                bandTop + band / 2f
+            } else {
+                bandTop + band * (slot.slot.toFloat() / (slot.slotsOnSide - 1))
+            }
 
-        // Buttons straddle the edge of the body: half on, half off.
         fun pegX(slot: PegSlot): Dp = when (slot.side) {
             Side.LEFT -> centreX - leftHalf
             Side.RIGHT -> centreX + rightHalf
@@ -147,14 +154,15 @@ fun HeadstockView(
                 leftHalf = leftHalf.toPx(),
                 rightHalf = rightHalf.toPx(),
                 neckHalf = neckHalf.toPx(),
-                top = topInset.toPx() - 6.dp.toPx(),
+                top = bodyTop.toPx(),
                 nutY = nutY.toPx(),
                 bodyColor = colors.surfaceContainerHighest,
                 neckColor = colors.surfaceContainerHigh,
+                edgeColor = colors.outlineVariant,
             )
 
             val spacing = if (instrument.stringCount > 1) {
-                neckHalf.toPx() * 2f / (instrument.stringCount - 1)
+                (neckHalf.toPx() * 2f * 0.82f) / (instrument.stringCount - 1)
             } else {
                 0f
             }
@@ -163,38 +171,37 @@ fun HeadstockView(
                 val active = slot.physicalIndex == activeIndex
                 val tuned = slot.physicalIndex in tunedIndices
 
-                // Even spacing across the fretboard, low string on the left.
                 val fretboardX = centreX.toPx() +
                     (slot.physicalIndex - (instrument.stringCount - 1) / 2f) * spacing
 
-                // The string ends under its own button, just inside the body edge.
                 val postX = when (slot.side) {
-                    Side.LEFT -> centreX.toPx() - leftHalf.toPx() + pegSize.toPx() * 0.18f
-                    Side.RIGHT -> centreX.toPx() + rightHalf.toPx() - pegSize.toPx() * 0.18f
+                    Side.LEFT -> centreX.toPx() - leftHalf.toPx() + pegSize.toPx() * 0.20f
+                    Side.RIGHT -> centreX.toPx() + rightHalf.toPx() - pegSize.toPx() * 0.20f
                 }
                 val postY = slotY(slot).toPx()
 
                 val color = when {
                     active -> colors.primary
-                    tuned -> colors.tertiary.copy(alpha = 0.7f)
-                    else -> colors.onSurfaceVariant.copy(alpha = 0.4f)
+                    tuned -> colors.tertiary.copy(alpha = 0.75f)
+                    else -> colors.onSurfaceVariant.copy(alpha = 0.42f)
                 }
-                val width = if (active) 3.5f.dp.toPx() else 1.6f.dp.toPx()
+                // Thicker for the lower strings, exactly like a real set. Nearly free, and it is
+                // the detail that stops six identical hairlines looking like a wireframe.
+                val gauge = 1.3f + (instrument.stringCount - 1 - slot.physicalIndex) * 0.22f
+                val strokeWidth = (if (active) gauge + 1.6f else gauge).dp.toPx()
 
-                // Fretboard run: dead straight, parallel, off the bottom of the component.
                 drawLine(
                     color = color,
                     start = Offset(fretboardX, size.height),
                     end = Offset(fretboardX, nutY.toPx()),
-                    strokeWidth = width,
+                    strokeWidth = strokeWidth,
                     cap = StrokeCap.Round,
                 )
-                // Fan from the nut out to the post.
                 drawLine(
                     color = color,
                     start = Offset(fretboardX, nutY.toPx()),
                     end = Offset(postX, postY),
-                    strokeWidth = width,
+                    strokeWidth = strokeWidth,
                     cap = StrokeCap.Round,
                 )
             }
@@ -202,9 +209,12 @@ fun HeadstockView(
             // The nut sits on top of the strings, which is how it looks in the hand.
             drawRoundRect(
                 color = colors.outline,
-                topLeft = Offset(centreX.toPx() - neckHalf.toPx() - 3.dp.toPx(), nutY.toPx() - 4.dp.toPx()),
-                size = Size(neckHalf.toPx() * 2f + 6.dp.toPx(), 8.dp.toPx()),
-                cornerRadius = CornerRadius(4.dp.toPx(), 4.dp.toPx()),
+                topLeft = Offset(
+                    centreX.toPx() - neckHalf.toPx() - 3.dp.toPx(),
+                    nutY.toPx() - 4.5f.dp.toPx(),
+                ),
+                size = Size(neckHalf.toPx() * 2f + 6.dp.toPx(), 9.dp.toPx()),
+                cornerRadius = CornerRadius(4.5f.dp.toPx(), 4.5f.dp.toPx()),
             )
         }
 
@@ -288,8 +298,11 @@ private fun PegButton(
 }
 
 /**
- * The body: a wide paddle that tapers into the neck, drawn as one path with corner radii large
- * enough to read as an M3 shape rather than a rounded rectangle.
+ * The body: a broad paddle with a soft square top that narrows into the neck.
+ *
+ * Drawn top-down as one closed path. The earlier version used control points derived from the
+ * corner radius, which pinched the waist into an hourglass on tall layouts; the shoulder is now a
+ * single cubic anchored to the body height, so it holds its shape whatever the aspect ratio.
  */
 private fun DrawScope.drawHeadstockBody(
     centreX: Float,
@@ -300,37 +313,42 @@ private fun DrawScope.drawHeadstockBody(
     nutY: Float,
     bodyColor: Color,
     neckColor: Color,
+    edgeColor: Color,
 ) {
     // Fretboard first, so the body overlaps it at the nut rather than butting against it.
     drawRect(
         color = neckColor,
-        topLeft = Offset(centreX - neckHalf, nutY - 4f),
-        size = Size(neckHalf * 2f, size.height - nutY + 4f),
+        topLeft = Offset(centreX - neckHalf, nutY - 6f),
+        size = Size(neckHalf * 2f, size.height - nutY + 6f),
     )
 
-    val corner = 30f * density
-    val taperStart = nutY - (nutY - top) * 0.34f
+    val bodyHeight = nutY - top
+    val corner = minOf(leftHalf, rightHalf) * 0.72f
+    // Where the straight sides give way to the shoulder.
+    val shoulder = top + bodyHeight * 0.66f
 
     val body = Path().apply {
         moveTo(centreX - leftHalf + corner, top)
         lineTo(centreX + rightHalf - corner, top)
         quadraticTo(centreX + rightHalf, top, centreX + rightHalf, top + corner)
-        lineTo(centreX + rightHalf, taperStart)
-        // One smooth shoulder down into the neck. A single cubic keeps it from pinching.
+        lineTo(centreX + rightHalf, shoulder)
         cubicTo(
-            centreX + rightHalf, nutY - (nutY - taperStart) * 0.25f,
-            centreX + neckHalf + 6f, nutY - (nutY - taperStart) * 0.30f,
-            centreX + neckHalf + 2f, nutY,
+            centreX + rightHalf, shoulder + bodyHeight * 0.20f,
+            centreX + neckHalf + (rightHalf - neckHalf) * 0.30f, nutY - bodyHeight * 0.04f,
+            centreX + neckHalf, nutY,
         )
-        lineTo(centreX - neckHalf - 2f, nutY)
+        lineTo(centreX - neckHalf, nutY)
         cubicTo(
-            centreX - neckHalf - 6f, nutY - (nutY - taperStart) * 0.30f,
-            centreX - leftHalf, nutY - (nutY - taperStart) * 0.25f,
-            centreX - leftHalf, taperStart,
+            centreX - neckHalf - (leftHalf - neckHalf) * 0.30f, nutY - bodyHeight * 0.04f,
+            centreX - leftHalf, shoulder + bodyHeight * 0.20f,
+            centreX - leftHalf, shoulder,
         )
         lineTo(centreX - leftHalf, top + corner)
         quadraticTo(centreX - leftHalf, top, centreX - leftHalf + corner, top)
         close()
     }
     drawPath(body, bodyColor)
+    // A hairline edge keeps the silhouette legible when the body and the background are close
+    // in tone, which happens on some dynamic-colour schemes.
+    drawPath(body, edgeColor, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.5f * density))
 }

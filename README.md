@@ -77,9 +77,13 @@ the 21 Hz analysis rate.
 
 ### Auto advance
 
-A string counts as tuned when it stays inside 2.5 cents, with clarity above 0.9, continuously for
-500 ms. Not zero cents: string inharmonicity and finger pressure make a true zero unreachable, and
-2.5 cents is comfortably under the roughly 5 cent difference a trained ear can hear.
+A string counts as tuned when it stays inside 5 cents, with clarity above 0.82, for 500 ms,
+tolerating up to three frames outside the window before the clock restarts.
+
+Every one of those numbers started stricter and had to be relaxed, because a plucked string is
+not a laboratory signal: it wobbles for the first few hundred milliseconds and the detector drops
+the odd frame as the note decays. At 2.5 cents with zero tolerance the hold essentially never
+completed.
 
 On success the app fires a two primitive haptic, plays a chime, and moves the target to the next
 string by ascending pitch. By pitch, not by peg position, so a re-entrant ukulele advances
@@ -111,6 +115,21 @@ composable and rounded to whole cents so it settles rather than flickers.
 Acoustic and electric six string, seven string, four and five string bass, ukulele. Tunings are
 stored as MIDI note numbers rather than frequencies, so the reference pitch is adjustable
 (A = 432 through 480 Hz) without touching a table.
+
+### Microphone selection
+
+The capture source decides which *physical* microphone the recorder is wired to, and they are not
+interchangeable. UNPROCESSED and VOICE_RECOGNITION usually select a secondary capsule, often the
+one beside the rear camera; MIC is the primary one at the bottom of the phone.
+
+The default is VOICE_RECOGNITION: gain control is off on nearly every OEM and it picks a
+microphone that is actually present. UNPROCESSED is better on paper, being the only source
+guaranteed to bypass all platform processing, but a clean signal from a microphone that does not
+work is worth nothing.
+
+Capture rotates through the available sources when one delivers nothing for two seconds, and the
+choice can be pinned in Settings. There is an input level meter under the tuning meter for the
+same reason: without it, a dead microphone and a silent room look identical from outside the app.
 
 ## Build
 

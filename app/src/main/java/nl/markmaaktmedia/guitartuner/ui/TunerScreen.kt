@@ -1,5 +1,6 @@
 package nl.markmaaktmedia.guitartuner.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -9,21 +10,26 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
@@ -54,6 +60,7 @@ import nl.markmaaktmedia.guitartuner.ui.components.TuningVisualizer
 @Composable
 fun TunerScreen(
     viewModel: TunerViewModel,
+    onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -68,6 +75,7 @@ fun TunerScreen(
             autoMode = state.autoMode,
             onSelect = viewModel::selectInstrument,
             onAutoChange = viewModel::setAutoMode,
+            onOpenSettings = onOpenSettings,
             modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
         )
 
@@ -90,8 +98,7 @@ fun TunerScreen(
         MicRow(
             levelDb = viewModel.inputLevelDb,
             sourceLabel = state.micSource.label,
-            pinned = state.micSourcePinned,
-            onCycle = viewModel::cycleMicSource,
+            onOpenSettings = onOpenSettings,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
         )
 
@@ -118,6 +125,7 @@ private fun InstrumentBar(
     autoMode: Boolean,
     onSelect: (Instrument) -> Unit,
     onAutoChange: (Boolean) -> Unit,
+    onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -151,8 +159,12 @@ private fun InstrumentBar(
             } else {
                 null
             },
-            modifier = Modifier.padding(end = 16.dp),
+            modifier = Modifier.padding(end = 4.dp),
         )
+
+        IconButton(onClick = onOpenSettings, modifier = Modifier.padding(end = 4.dp)) {
+            Icon(Icons.Rounded.Settings, contentDescription = "Settings")
+        }
     }
 }
 
@@ -160,16 +172,15 @@ private fun InstrumentBar(
  * Input level plus the capture path in use.
  *
  * The level bar is not decoration. It is the difference between "the app is broken" and "that
- * microphone is dead", which on a handset with a damaged rear capsule is the whole story. Tapping
- * the chip steps to the next capture path and pins it, because the automatic fallback can only
- * react to silence, not to a microphone that works but hears the wrong thing.
+ * microphone is dead", which on a handset with a damaged rear capsule is the whole story. The
+ * label is a shortcut into Settings, where the capture path can be changed, because that is the
+ * fix once the bar tells you nothing is arriving.
  */
 @Composable
 private fun MicRow(
     levelDb: StateFlow<Float>,
     sourceLabel: String,
-    pinned: Boolean,
-    onCycle: () -> Unit,
+    onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -179,13 +190,26 @@ private fun MicRow(
     ) {
         InputLevelBar(levelDb, Modifier.weight(1f))
 
-        // Selected means "you picked this", unselected means "the fallback landed here".
-        FilterChip(
-            selected = pinned,
-            onClick = onCycle,
-            label = { Text(sourceLabel) },
-            leadingIcon = { Icon(Icons.Rounded.Mic, contentDescription = null) },
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            modifier = Modifier
+                .clip(RoundedCornerShape(percent = 50))
+                .clickable(onClick = onOpenSettings)
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+        ) {
+            Icon(
+                Icons.Rounded.Mic,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(15.dp),
+            )
+            Text(
+                text = sourceLabel,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 

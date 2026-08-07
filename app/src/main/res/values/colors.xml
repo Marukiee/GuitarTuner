@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#8A5100</color>
+    <!-- Same dark square MarkMySteps wears, so the two read as one family on the home screen. -->
+    <color name="ic_launcher_background">#171C24</color>
 </resources>

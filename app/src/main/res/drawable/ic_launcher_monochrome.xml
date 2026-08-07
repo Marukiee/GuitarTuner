@@ -1,28 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- An eighth note as a bare stroked outline, matching the MarkMySteps compass mark:
-     same weight, same rounded caps, same accent. The group scales a 24 unit drawing
-     into the 66dp safe zone of a 108dp adaptive icon. -->
+<!-- Themed-icon layer: same mark, single colour, tinted by the launcher. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
-    android:viewportHeight="108">
+    android:viewportHeight="108"
+    android:tint="#FFFFFF">
     <group
         android:translateX="21"
         android:translateY="21"
         android:scaleX="2.75"
         android:scaleY="2.75">
-        <!-- Note head. -->
         <path
             android:pathData="M8,17.6 m-3.9,0 a3.9,3.9 0 1,0 7.8,0 a3.9,3.9 0 1,0 -7.8,0"
-            android:strokeColor="#E8613C"
+            android:strokeColor="#FFFFFF"
             android:strokeWidth="2.2"
             android:strokeLineCap="round"
             android:strokeLineJoin="round" />
-        <!-- Stem and flag in one stroke. -->
         <path
             android:pathData="M11.9,17.6 L11.9,4.6 C16.1,5.8 18.3,8.5 18,12"
-            android:strokeColor="#E8613C"
+            android:strokeColor="#FFFFFF"
             android:strokeWidth="2.2"
             android:strokeLineCap="round"
             android:strokeLineJoin="round" />

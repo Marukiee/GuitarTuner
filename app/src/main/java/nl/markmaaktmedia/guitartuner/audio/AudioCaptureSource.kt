@@ -68,13 +68,21 @@ class AudioCaptureSource(
 
     private val audioManager: AudioManager? = context.getSystemService(AudioManager::class.java)
 
-    /** Sources worth trying on this device, best first. */
+    /**
+     * Sources worth trying on this device, in fallback order.
+     *
+     * Voice recognition leads, not unprocessed. Unprocessed is the better source in theory and
+     * the reason is real (it is the only one guaranteed to bypass AGC and noise suppression),
+     * but on most handsets it selects a secondary capsule, and a theoretically clean signal from
+     * a microphone that does not work is worth nothing. Voice recognition has AGC off on nearly
+     * every OEM and picks a mic that is actually there.
+     */
     fun availableSources(): List<MicSource> = buildList {
+        add(MicSource.VoiceRecognition)
+        add(MicSource.Main)
         if (audioManager?.getProperty(AudioManager.PROPERTY_SUPPORT_AUDIO_SOURCE_UNPROCESSED) == "true") {
             add(MicSource.Unprocessed)
         }
-        add(MicSource.VoiceRecognition)
-        add(MicSource.Main)
         add(MicSource.Camcorder)
     }
 

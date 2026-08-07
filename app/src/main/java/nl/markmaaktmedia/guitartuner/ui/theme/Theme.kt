@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
+import nl.markmaaktmedia.guitartuner.domain.model.ThemeMode
 
 /**
  * Fallback palette for Android 11 and older, where there is no wallpaper to derive from.
@@ -56,11 +57,17 @@ private val ColorScheme.isLight: Boolean
 
 @Composable
 fun GuitarTunerTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    themeMode: ThemeMode = ThemeMode.System,
     /** Material You wallpaper extraction. Available from Android 12 (API 31). */
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit,
 ) {
+    val darkTheme = when (themeMode) {
+        ThemeMode.System -> isSystemInDarkTheme()
+        ThemeMode.Light -> false
+        ThemeMode.Dark -> true
+    }
+
     val context = LocalContext.current
     val colorScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->

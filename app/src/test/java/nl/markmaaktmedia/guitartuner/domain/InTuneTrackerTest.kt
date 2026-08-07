@@ -28,14 +28,33 @@ class InTuneTrackerTest {
     }
 
     @Test
-    fun `a single frame outside the window resets the clock`() {
-        val tracker = InTuneTracker(holdMillis = 500L)
+    fun `a brief wobble does not reset the clock`() {
+        // A plucked string is not stable for the first few hundred milliseconds, so a couple of
+        // frames outside the window have to be survivable or the hold never completes.
+        val tracker = InTuneTracker(holdMillis = 500L, graceFrames = 3)
+        assertFalse(tracker.update(reading(0.5f), 0L))
+        assertFalse(tracker.update(reading(9f), 200L)) // wobbled sharp
+        assertFalse(tracker.update(reading(9f), 250L))
+        assertTrue(tracker.update(reading(0.5f), 520L))
+    }
+
+    @Test
+    fun `sustained drift outside the window does reset the clock`() {
+        val tracker = InTuneTracker(holdMillis = 500L, graceFrames = 3)
         tracker.update(reading(0.5f), 0L)
-        tracker.update(reading(9f), 300L) // wobbled sharp
-        // The clock restarts here, so the full 500 ms has to elapse again from 520.
-        assertFalse(tracker.update(reading(0.5f), 520L))
-        assertFalse(tracker.update(reading(0.5f), 830L))
-        assertTrue(tracker.update(reading(0.5f), 1030L))
+        repeat(4) { i -> tracker.update(reading(20f), 100L + i * 46L) }
+        // Clock restarted, so the full hold has to elapse again from here.
+        assertFalse(tracker.update(reading(0.5f), 400L))
+        assertFalse(tracker.update(reading(0.5f), 700L))
+        assertTrue(tracker.update(reading(0.5f), 950L))
+    }
+
+    @Test
+    fun `five cents counts as in tune`() {
+        // 2.5 cents was unreachable in the hand while a plucked note decays.
+        val tracker = InTuneTracker(holdMillis = 500L)
+        assertFalse(tracker.update(reading(4.4f), 0L))
+        assertTrue(tracker.update(reading(-4.4f), 520L))
     }
 
     @Test

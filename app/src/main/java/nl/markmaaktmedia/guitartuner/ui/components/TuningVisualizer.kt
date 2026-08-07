@@ -30,6 +30,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asComposePath
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.res.stringResource
@@ -298,16 +299,30 @@ private const val IDLE_PRESENCE = 0.34f
 /**
  * The one part that really recomposes. Rounding to whole cents means it changes a few times a
  * second at most instead of on every reading.
+ *
+ * The colour is computed here rather than inherited, and it is picked from the *luminance of the
+ * bubble underneath*. A fixed `onPrimary` was white, which is unreadable the moment the bubble is
+ * a light tone, and on a dynamic-colour scheme there is no way to know in advance whether it will
+ * be. This mirrors the same closeness curve the bubble uses, so the two can never disagree.
  */
 @Composable
 private fun CentsReadout(reading: StateFlow<TuningReading?>) {
+    val colors = MaterialTheme.colorScheme
     val current by reading.collectAsStateWithLifecycle()
     val cents = current?.cents?.let { Math.round(it) } ?: 0
 
+    val bubble = current?.let {
+        lerp(
+            if (it.cents < 0f) colors.flatAccent else colors.sharpAccent,
+            colors.primary,
+            closenessOf(it.cents),
+        )
+    } ?: colors.surfaceContainerHighest
+
     Text(
         text = if (current == null) "" else if (cents > 0) "+$cents" else "$cents",
-        color = MaterialTheme.colorScheme.onPrimary,
-        fontSize = 30.sp,
+        color = if (bubble.luminance() > 0.45f) Color(0xFF10131A) else Color.White,
+        fontSize = 32.sp,
         fontWeight = FontWeight.Bold,
         textAlign = TextAlign.Center,
     )

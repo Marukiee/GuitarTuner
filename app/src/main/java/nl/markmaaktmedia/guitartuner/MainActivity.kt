@@ -4,9 +4,19 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,7 +30,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -36,6 +49,7 @@ import nl.markmaaktmedia.guitartuner.domain.model.TunerEvent
 import nl.markmaaktmedia.guitartuner.ui.TunerFeedback
 import nl.markmaaktmedia.guitartuner.ui.TunerScreen
 import nl.markmaaktmedia.guitartuner.ui.TunerViewModel
+import nl.markmaaktmedia.guitartuner.ui.settings.SettingsScreen
 import nl.markmaaktmedia.guitartuner.ui.theme.GuitarTunerTheme
 import nl.markmaaktmedia.guitartuner.update.UpdateBanner
 
@@ -45,13 +59,18 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContent {
-            GuitarTunerTheme {
+            // The view model is created *outside* the theme on purpose: the chosen theme mode is
+            // part of its state, so the theme cannot be the thing that owns it.
+            val viewModel: TunerViewModel = viewModel()
+            val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+            GuitarTunerTheme(themeMode = state.themeMode) {
                 Surface(
                     color = MaterialTheme.colorScheme.background,
                     modifier = Modifier.fillMaxSize(),
                 ) {
                     Box(Modifier.fillMaxSize()) {
-                        TunerHost()
+                        AppContent(viewModel)
                         // Floats over the screen instead of pushing it down, same as MarkMySteps.
                         UpdateBanner(Modifier.align(Alignment.TopCenter))
                     }
@@ -62,20 +81,21 @@ class MainActivity : ComponentActivity() {
 }
 
 /**
- * Wires permission, lifecycle and one shot feedback around the view model.
+ * Two destinations and one back gesture, which is not worth a navigation library.
  *
- * The expressive visualizer and headstock live in [TunerScreen]; this scaffolding is what they
- * plug into and is intentionally kept free of any drawing.
+ * The tuner keeps listening while Settings is open, so changing the microphone or the instrument
+ * takes effect immediately and the input meter can be watched react without leaving the page.
  */
 @Composable
-private fun TunerHost(viewModel: TunerViewModel = viewModel()) {
+private fun AppContent(viewModel: TunerViewModel) {
     val context = LocalContext.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    var showSettings by rememberSaveable { mutableStateOf(false) }
 
     val feedback = remember { TunerFeedback(context) }
     DisposableEffect(Unit) { onDispose { feedback.release() } }
 
-    val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+    val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
         viewModel.onPermissionResult(
@@ -112,10 +132,43 @@ private fun TunerHost(viewModel: TunerViewModel = viewModel()) {
         }
     }
 
-    if (state.micPermission != MicPermissionState.Granted) {
-        PermissionGate(onRequest = { permissionLauncher.launch(Manifest.permission.RECORD_AUDIO) })
-    } else {
-        TunerScreen(viewModel)
+    BackHandler(enabled = showSettings) { showSettings = false }
+
+    AnimatedContent(
+        targetState = showSettings,
+        transitionSpec = {
+            val spec = spring<Float>(stiffness = Spring.StiffnessMediumLow)
+            if (targetState) {
+                (slideInHorizontally { it / 4 } + fadeIn(spec)) togetherWith
+                    (slideOutHorizontally { -it / 8 } + fadeOut(spec))
+            } else {
+                (slideInHorizontally { -it / 8 } + fadeIn(spec)) togetherWith
+                    (slideOutHorizontally { it / 4 } + fadeOut(spec))
+            }
+        },
+        label = "screen",
+    ) { settings ->
+        when {
+            settings -> SettingsScreen(
+                instrument = state.instrument,
+                micSource = state.micSource,
+                micOptions = viewModel.micSourceOptions(),
+                themeMode = state.themeMode,
+                referenceHz = state.referenceHz,
+                onInstrument = viewModel::selectInstrument,
+                onMicSource = viewModel::setMicSource,
+                onThemeMode = viewModel::setThemeMode,
+                onReferenceHz = viewModel::setReferencePitch,
+                onBack = { showSettings = false },
+                versionName = BuildConfig.VERSION_NAME,
+            )
+
+            state.micPermission != MicPermissionState.Granted -> PermissionGate(
+                onRequest = { permissionLauncher.launch(Manifest.permission.RECORD_AUDIO) },
+            )
+
+            else -> TunerScreen(viewModel, onOpenSettings = { showSettings = true })
+        }
     }
 }
 

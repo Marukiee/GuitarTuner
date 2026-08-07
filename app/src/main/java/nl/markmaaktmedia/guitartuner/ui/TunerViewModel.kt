@@ -19,12 +19,14 @@ import nl.markmaaktmedia.guitartuner.audio.AudioCaptureSource
 import nl.markmaaktmedia.guitartuner.audio.McLeodPitchDetector
 import nl.markmaaktmedia.guitartuner.audio.MicSource
 import nl.markmaaktmedia.guitartuner.audio.PitchEngine
+import nl.markmaaktmedia.guitartuner.data.TunerPreferences
 import nl.markmaaktmedia.guitartuner.domain.InTuneTracker
 import nl.markmaaktmedia.guitartuner.domain.StringMatcher
 import nl.markmaaktmedia.guitartuner.domain.model.Instrument
 import nl.markmaaktmedia.guitartuner.domain.model.MicPermissionState
 import nl.markmaaktmedia.guitartuner.domain.model.Note
 import nl.markmaaktmedia.guitartuner.domain.model.TunerEvent
+import nl.markmaaktmedia.guitartuner.domain.model.ThemeMode
 import nl.markmaaktmedia.guitartuner.domain.model.TunerUiState
 import nl.markmaaktmedia.guitartuner.domain.model.TuningReading
 
@@ -50,9 +52,18 @@ class TunerViewModel(application: Application) : AndroidViewModel(application) {
     private val inTuneTracker = InTuneTracker()
 
     private val sourceCandidates = engine.availableSources()
+    private val preferences = TunerPreferences(application)
 
     private val _uiState = MutableStateFlow(
-        TunerUiState(micSource = sourceCandidates.first()),
+        TunerUiState(
+            instrument = preferences.instrument,
+            activeStringIndex = preferences.instrument.ascendingByPitch.first().physicalIndex,
+            referenceHz = preferences.referenceHz,
+            micSource = preferences.micSource,
+            // A stored source is a deliberate choice, so the automatic fallback stays out of it.
+            micSourcePinned = true,
+            themeMode = preferences.themeMode,
+        ),
     )
     val uiState: StateFlow<TunerUiState> = _uiState.asStateFlow()
 
@@ -82,6 +93,7 @@ class TunerViewModel(application: Application) : AndroidViewModel(application) {
 
     fun selectInstrument(instrument: Instrument) {
         if (instrument == _uiState.value.instrument) return
+        preferences.instrument = instrument
         engine.configureFor(instrument)
         inTuneTracker.reset()
         _reading.value = null
@@ -112,23 +124,26 @@ class TunerViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun setReferencePitch(hz: Float) {
-        _uiState.update { it.copy(referenceHz = hz.coerceIn(400f, 480f)) }
+        val clamped = hz.coerceIn(400f, 480f)
+        preferences.referenceHz = clamped
+        _uiState.update { it.copy(referenceHz = clamped) }
     }
 
-    /**
-     * Step to the next capture path by hand.
-     *
-     * Needed because the automatic fallback can only react to *silence*, and a microphone can be
-     * wrong without being silent: a rear mic picking up a muffled room still produces a level, it
-     * just produces a useless one. Pinning also stops the fallback from wandering off the source
-     * the user picked.
-     */
-    fun cycleMicSource() {
-        val current = sourceCandidates.indexOf(_uiState.value.micSource)
-        val next = sourceCandidates[(current + 1) % sourceCandidates.size]
-        _uiState.update { it.copy(micSource = next, micSourcePinned = true) }
+    fun setThemeMode(mode: ThemeMode) {
+        preferences.themeMode = mode
+        _uiState.update { it.copy(themeMode = mode) }
+    }
+
+    /** Explicit choice from Settings. Pins the source so the fallback leaves it alone. */
+    fun setMicSource(source: MicSource) {
+        if (source == _uiState.value.micSource && _uiState.value.micSourcePinned) return
+        preferences.micSource = source
+        sourceProven = true
+        _uiState.update { it.copy(micSource = source, micSourcePinned = true) }
         restartListening()
     }
+
+    fun micSourceOptions(): List<MicSource> = sourceCandidates
 
     fun onPermissionResult(state: MicPermissionState) {
         _uiState.update { it.copy(micPermission = state) }

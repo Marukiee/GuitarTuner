@@ -46,11 +46,15 @@ data class TuningReading(
 
     companion object {
         /**
-         * Half-width of the "perfect" window. Not 0.0: string inharmonicity, pick attack and
-         * finger pressure make a true zero unreachable, and 2.5 cents is well under the ~5 cent
-         * just-noticeable difference for a trained ear.
+         * Half-width of the "perfect" window.
+         *
+         * Not 0.0: string inharmonicity, pick attack and finger pressure make a true zero
+         * unreachable. It started at 2.5 cents, which is defensible on paper and miserable in
+         * the hand, because holding a plucked string inside 2.5 cents for half a second while
+         * the note decays is close to impossible. 5 cents is still at the edge of what a trained
+         * ear can hear and is actually reachable.
          */
-        const val IN_TUNE_CENTS = 2.5f
+        const val IN_TUNE_CENTS = 5f
 
         /** Cents shown from centre to either edge of the meter. */
         const val METER_RANGE_CENTS = 50f
@@ -73,9 +77,10 @@ data class TunerUiState(
     val micPermission: MicPermissionState = MicPermissionState.Unknown,
     val isListening: Boolean = false,
     /** Which capture path is live. Rotates automatically when one turns out to be dead. */
-    val micSource: MicSource = MicSource.Main,
+    val micSource: MicSource = MicSource.VoiceRecognition,
     /** True once the user has chosen a source by hand, which stops the automatic fallback. */
     val micSourcePinned: Boolean = false,
+    val themeMode: ThemeMode = ThemeMode.System,
 ) {
     val activeString: TuningString
         get() = instrument.strings.getOrElse(activeStringIndex) { instrument.strings.first() }

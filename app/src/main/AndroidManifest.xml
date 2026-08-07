@@ -3,6 +3,12 @@
 
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Only ever used to ask the GitHub Releases API whether a newer APK exists.
+         No audio, and nothing else, ever leaves the device. Without this the update
+         check throws a SecurityException that the checker swallows, so the banner
+         silently never appears. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <uses-feature
         android:name="android.hardware.microphone"

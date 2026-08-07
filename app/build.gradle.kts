@@ -91,6 +91,8 @@ android {
 
     buildFeatures {
         compose = true
+        // BuildConfig.VERSION_NAME is shown on the Settings page.
+        buildConfig = true
     }
 
     packaging {
