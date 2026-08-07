@@ -8,9 +8,8 @@ when a new build is out. Audio never leaves the device.
 
 ## Status
 
-Core is in place: audio capture, pitch detection, string matching, auto advance, signing and
-release automation. The expressive UI (the animated tuning visualizer and the dynamic headstock)
-is the next piece of work; the app currently renders a plain readout on top of the same state.
+Working end to end: audio capture, pitch detection, string matching, auto advance, the animated
+tuning meter, the dynamic headstock, signed releases and in app update notification.
 
 ## Install
 
@@ -89,6 +88,23 @@ C4, E4, G4, A4 rather than following the headstock.
 The chime is a G6 into a C7. Both sit far above the detector's ceiling of about 420 Hz, so the
 sound coming out of the speaker can never be picked up by the microphone and mistaken for a
 string.
+
+### Keeping the animation fluid
+
+The reading flow drives three `Animatable`s, and every one of them is read *inside* a `Canvas`
+draw lambda or a `graphicsLayer` block. A state read in either place invalidates only the draw
+phase, so 21 readings a second never reach composition or layout, and the springs interpolate at
+display refresh rate rather than at the analysis rate.
+
+`collectLatest` cancels the previous `animateTo` when a new reading lands. A cancelled
+`Animatable` keeps its velocity, so retargeting 21 times a second reads as one continuous motion
+instead of a series of restarts. The position spring is deliberately under damped (0.62) so the
+bubble overshoots slightly and settles back.
+
+The bubble itself morphs between an eight point cookie and a circle using `androidx.graphics
+.shapes`, with rotation speed scaled by distance from the target, so it visibly stops turning as
+it locks on. The only thing that genuinely recomposes is the cents readout, isolated in its own
+composable and rounded to whole cents so it settles rather than flickers.
 
 ### Supported instruments
 

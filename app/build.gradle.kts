@@ -49,6 +49,11 @@ android {
                 storePassword = signingValue("GT_KEYSTORE_PASSWORD", "storePassword")
                 keyAlias = signingValue("GT_KEY_ALIAS", "keyAlias")
                 keyPassword = signingValue("GT_KEY_PASSWORD", "keyPassword")
+                // minSdk 26 means v1 JAR signing is dead weight. v3 is worth having on top of
+                // v2 because it is the scheme that supports signing key rotation later on.
+                enableV1Signing = false
+                enableV2Signing = true
+                enableV3Signing = true
             }
         }
     }
