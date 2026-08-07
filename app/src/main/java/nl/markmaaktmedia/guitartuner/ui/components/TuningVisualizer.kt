@@ -1,0 +1,303 @@
+package nl.markmaaktmedia.guitartuner.ui.components
+
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Matrix
+import androidx.compose.ui.graphics.asComposePath
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.graphics.shapes.CornerRounding
+import androidx.graphics.shapes.Morph
+import androidx.graphics.shapes.RoundedPolygon
+import androidx.graphics.shapes.circle
+import androidx.graphics.shapes.star
+import androidx.graphics.shapes.toPath
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
+import nl.markmaaktmedia.guitartuner.R
+import nl.markmaaktmedia.guitartuner.domain.model.TuningReading
+import nl.markmaaktmedia.guitartuner.domain.model.TuningStatus
+import nl.markmaaktmedia.guitartuner.ui.theme.flatAccent
+import nl.markmaaktmedia.guitartuner.ui.theme.sharpAccent
+import kotlin.math.abs
+
+/**
+ * The tuning meter: a fixed target line with a morphing bubble that swims towards it.
+ *
+ * ## Why this is built the way it is
+ *
+ * The reading arrives about 21 times a second. If the composable read it as ordinary state, the
+ * whole subtree would recompose 21 times a second and the animation would be quantised to the
+ * analysis rate rather than the display rate.
+ *
+ * Instead the flow drives three [Animatable]s inside a `LaunchedEffect`, and every one of them is
+ * read *inside* the `Canvas` draw lambda or a `graphicsLayer` block. A state read in either place
+ * invalidates only the draw phase: no recomposition, no relayout, and the springs interpolate at
+ * whatever rate the display runs at. `collectLatest` cancels the previous `animateTo` when a new
+ * reading lands, and a cancelled `Animatable` keeps its velocity, so retargeting 21 times a
+ * second reads as one continuous motion rather than a series of restarts.
+ *
+ * The only thing that genuinely recomposes is the numeric readout, which is isolated in its own
+ * composable and rounded to whole cents so it settles rather than flickering.
+ */
+@Composable
+fun TuningVisualizer(
+    reading: StateFlow<TuningReading?>,
+    modifier: Modifier = Modifier,
+) {
+    val colors = MaterialTheme.colorScheme
+    val density = LocalDensity.current
+
+    // Horizontal position of the bubble, -1 (50 cents flat) to +1 (50 cents sharp).
+    val offset = remember { Animatable(0f) }
+    // 0 = far from the target, 1 = dead on. Drives colour, shape and rotation together.
+    val closeness = remember { Animatable(0f) }
+    // 0 = nothing is being heard, 1 = a note is present. Fades the bubble in and out.
+    val presence = remember { Animatable(0f) }
+
+    LaunchedEffectReading(reading, offset, closeness, presence)
+
+    val spin = rememberInfiniteTransition(label = "spin").animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(11_000, easing = LinearEasing)),
+        label = "spinAngle",
+    )
+
+    // Morph endpoints are allocated once. Rebuilding a RoundedPolygon per frame would undo the
+    // whole point of keeping this in the draw phase.
+    val morph = remember {
+        Morph(
+            start = RoundedPolygon.star(
+                numVerticesPerRadius = 8,
+                innerRadius = 0.82f,
+                rounding = CornerRounding(0.45f),
+                innerRounding = CornerRounding(0.55f),
+            ),
+            end = RoundedPolygon.circle(numVertices = 16),
+        )
+    }
+
+    Column(modifier, verticalArrangement = Arrangement.Center) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            contentAlignment = Alignment.Center,
+        ) {
+            Canvas(Modifier.fillMaxSize()) {
+                val centreX = size.width / 2f
+                val centreY = size.height / 2f
+                val bubbleRadius = with(density) { 58.dp.toPx() }
+                val travel = centreX - bubbleRadius - with(density) { 12.dp.toPx() }
+
+                drawScale(
+                    centreX = centreX,
+                    centreY = centreY,
+                    travel = travel,
+                    tickColor = colors.onSurfaceVariant.copy(alpha = 0.35f),
+                    targetColor = colors.primary,
+                    density = density,
+                )
+
+                val here = offset.value
+                val near = closeness.value
+                val alpha = presence.value
+                if (alpha <= 0.01f) return@Canvas
+
+                val bubbleColor = lerp(
+                    if (here < 0f) colors.flatAccent else colors.sharpAccent,
+                    colors.primary,
+                    near,
+                )
+
+                // Off target the bubble is a slowly turning cookie; on target it settles into a
+                // still circle and swells slightly, which is the "locked on" cue.
+                val path = morph.toPath(progress = near).asComposePath()
+                val scale = bubbleRadius * (0.92f + 0.08f * near)
+                path.transform(
+                    Matrix().apply {
+                        translate(centreX + here * travel, centreY)
+                        rotateZ(spin.value * (1f - near))
+                        scale(scale, scale)
+                    },
+                )
+
+                drawPath(path, bubbleColor.copy(alpha = alpha))
+            }
+
+            // The readout rides along with the bubble. translationX is a draw-phase property, so
+            // moving it does not relayout the text.
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.graphicsLayer {
+                    val travel = size.width / 2f - with(density) { 70.dp.toPx() }
+                    translationX = offset.value * travel
+                    alpha = presence.value
+                },
+            ) {
+                CentsReadout(reading)
+            }
+        }
+
+        StatusLabel(reading, Modifier.fillMaxWidth().padding(top = 4.dp))
+    }
+}
+
+/**
+ * Split out so the springs are set up once and the flow subscription is not re-created on every
+ * recomposition of the visualizer.
+ */
+@Composable
+private fun LaunchedEffectReading(
+    reading: StateFlow<TuningReading?>,
+    offset: Animatable<Float, *>,
+    closeness: Animatable<Float, *>,
+    presence: Animatable<Float, *>,
+) {
+    LaunchedEffect(reading) {
+        reading.collectLatest { current ->
+            if (current == null) {
+                coroutineScope {
+                    launch { presence.animateTo(0f, tween(350)) }
+                    launch { closeness.animateTo(0f, spring(stiffness = Spring.StiffnessLow)) }
+                }
+                return@collectLatest
+            }
+            coroutineScope {
+                launch {
+                    presence.animateTo(1f, spring(stiffness = Spring.StiffnessMediumLow))
+                }
+                launch {
+                    closeness.animateTo(
+                        targetValue = closenessOf(current.cents),
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                            stiffness = Spring.StiffnessMediumLow,
+                        ),
+                    )
+                }
+                launch {
+                    offset.animateTo(
+                        targetValue = current.normalizedOffset,
+                        // Slightly under-damped on purpose: the bubble overshoots the target a
+                        // hair and settles back, which reads as physical rather than mechanical.
+                        animationSpec = spring(
+                            dampingRatio = 0.62f,
+                            stiffness = Spring.StiffnessMediumLow,
+                        ),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 1 at the target, 0 at 25 cents out. Deliberately steeper than the meter's own 50 cent span so
+ * the in-tune colour is earned rather than being the default half the time.
+ */
+private fun closenessOf(cents: Float): Float =
+    (1f - (abs(cents) / 25f)).coerceIn(0f, 1f)
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawScale(
+    centreX: Float,
+    centreY: Float,
+    travel: Float,
+    tickColor: Color,
+    targetColor: Color,
+    density: androidx.compose.ui.unit.Density,
+) {
+    val minorHeight = with(density) { 10.dp.toPx() }
+    val majorHeight = with(density) { 18.dp.toPx() }
+    val tickY = centreY + with(density) { 96.dp.toPx() }
+
+    for (cents in -50..50 step 5) {
+        if (cents == 0) continue
+        val major = cents % 25 == 0
+        val x = centreX + (cents / 50f) * travel
+        val half = (if (major) majorHeight else minorHeight) / 2f
+        drawLine(
+            color = tickColor,
+            start = Offset(x, tickY - half),
+            end = Offset(x, tickY + half),
+            strokeWidth = with(density) { (if (major) 2.5f else 1.5f).dp.toPx() },
+        )
+    }
+
+    // The target line runs the full height of the meter so the bubble visibly crosses it.
+    drawLine(
+        color = targetColor,
+        start = Offset(centreX, centreY - with(density) { 86.dp.toPx() }),
+        end = Offset(centreX, tickY + majorHeight),
+        strokeWidth = with(density) { 3.dp.toPx() },
+    )
+}
+
+/**
+ * The one part that really recomposes. Rounding to whole cents means it changes a few times a
+ * second at most instead of on every reading.
+ */
+@Composable
+private fun CentsReadout(reading: StateFlow<TuningReading?>) {
+    val current by reading.collectAsStateWithLifecycle()
+    val cents = current?.cents?.let { Math.round(it) } ?: 0
+
+    Text(
+        text = if (current == null) "" else if (cents > 0) "+$cents" else "$cents",
+        color = MaterialTheme.colorScheme.onPrimary,
+        fontSize = 30.sp,
+        fontWeight = FontWeight.Bold,
+        textAlign = TextAlign.Center,
+    )
+}
+
+@Composable
+private fun StatusLabel(reading: StateFlow<TuningReading?>, modifier: Modifier = Modifier) {
+    val current by reading.collectAsStateWithLifecycle()
+    val label = when (current?.status) {
+        null -> R.string.listening
+        TuningStatus.FLAT -> R.string.tune_up
+        TuningStatus.SHARP -> R.string.tune_down
+        TuningStatus.IN_TUNE -> R.string.in_tune
+    }
+    Text(
+        text = stringResource(label),
+        style = MaterialTheme.typography.titleMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = TextAlign.Center,
+        modifier = modifier,
+    )
+}

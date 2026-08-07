@@ -34,6 +34,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import nl.markmaaktmedia.guitartuner.domain.model.MicPermissionState
 import nl.markmaaktmedia.guitartuner.domain.model.TunerEvent
 import nl.markmaaktmedia.guitartuner.ui.TunerFeedback
+import nl.markmaaktmedia.guitartuner.ui.TunerScreen
 import nl.markmaaktmedia.guitartuner.ui.TunerViewModel
 import nl.markmaaktmedia.guitartuner.ui.theme.GuitarTunerTheme
 import nl.markmaaktmedia.guitartuner.update.UpdateBanner
@@ -63,8 +64,8 @@ class MainActivity : ComponentActivity() {
 /**
  * Wires permission, lifecycle and one shot feedback around the view model.
  *
- * The expressive visualizer and headstock go inside [TunerContent]; this scaffolding is what
- * they plug into and is intentionally kept free of any drawing.
+ * The expressive visualizer and headstock live in [TunerScreen]; this scaffolding is what they
+ * plug into and is intentionally kept free of any drawing.
  */
 @Composable
 private fun TunerHost(viewModel: TunerViewModel = viewModel()) {
@@ -114,7 +115,7 @@ private fun TunerHost(viewModel: TunerViewModel = viewModel()) {
     if (state.micPermission != MicPermissionState.Granted) {
         PermissionGate(onRequest = { permissionLauncher.launch(Manifest.permission.RECORD_AUDIO) })
     } else {
-        TunerContent(viewModel)
+        TunerScreen(viewModel)
     }
 }
 
@@ -133,36 +134,5 @@ private fun PermissionGate(onRequest: () -> Unit) {
         Button(onClick = onRequest) {
             Text(stringResource(R.string.grant_permission))
         }
-    }
-}
-
-/**
- * Placeholder for the real screen. Next step replaces this with the expressive visualizer on top
- * and the dynamic headstock below.
- */
-@Composable
-private fun TunerContent(viewModel: TunerViewModel) {
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val reading by viewModel.reading.collectAsStateWithLifecycle()
-
-    Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(state.instrument.displayName, style = MaterialTheme.typography.titleMedium)
-        Text(
-            text = state.activeString.fullLabel,
-            style = MaterialTheme.typography.displayLarge,
-        )
-        val current = reading
-        Text(
-            text = if (current == null) {
-                stringResource(R.string.listening)
-            } else {
-                "%+.1f cents  ·  %.2f Hz".format(current.cents, current.frequencyHz)
-            },
-            style = MaterialTheme.typography.bodyLarge,
-        )
     }
 }

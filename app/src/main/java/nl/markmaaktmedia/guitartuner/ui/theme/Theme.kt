@@ -2,6 +2,7 @@ package nl.markmaaktmedia.guitartuner.ui.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -9,6 +10,7 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 
 /**
@@ -33,6 +35,24 @@ private val FallbackDark = darkColorScheme(
     secondary = Color(0xFFE2C0A5),
     tertiary = Color(0xFFC2CB99),
 )
+
+/**
+ * The two ends of the tuning meter.
+ *
+ * These are deliberately *not* taken from the colour scheme. Dynamic colour gives no guarantee
+ * that any scheme role is warm or cool, and the whole point of the gradient is that flat reads as
+ * warm and sharp reads as cool regardless of wallpaper. Only the in-tune colour comes from the
+ * scheme, which is where the wallpaper shows up.
+ */
+val ColorScheme.flatAccent: Color
+    get() = if (isLight) Color(0xFFD2601A) else Color(0xFFFF9F5A)
+
+val ColorScheme.sharpAccent: Color
+    get() = if (isLight) Color(0xFF1A6FD2) else Color(0xFF67B4FF)
+
+/** A scheme is light when its surface is bright; there is no flag on ColorScheme itself. */
+private val ColorScheme.isLight: Boolean
+    get() = surface.luminance() > 0.5f
 
 @Composable
 fun GuitarTunerTheme(
