@@ -23,7 +23,8 @@ jobs:
       # androidx versions this app uses.
       - uses: android-actions/setup-android@v3
         with:
-          packages: 'platforms;android-37 build-tools;37.0.0'
+          # API 37 ships as a minor-versioned package, so the id carries the ".0".
+          packages: 'platforms;android-37.0 build-tools;37.0.0'
 
       - uses: gradle/actions/setup-gradle@v4
 
@@ -38,8 +39,12 @@ jobs:
         id: keystore
         env:
           KS_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KS_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: |
-          if [ -n "$KS_B64" ]; then
+          # All three must be present. A keystore without its password produces a confusing
+          # Gradle failure late in the build instead of a clean fallback here.
+          if [ -n "$KS_B64" ] && [ -n "$KS_PASS" ] && [ -n "$KS_ALIAS" ]; then
             echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
             echo "signed=true" >> "$GITHUB_OUTPUT"
           else
