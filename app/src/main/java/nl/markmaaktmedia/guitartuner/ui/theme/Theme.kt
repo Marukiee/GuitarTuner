@@ -57,6 +57,17 @@ val ColorScheme.flatAccent: Color
 val ColorScheme.sharpAccent: Color
     get() = if (isLight) Color(0xFF14479E) else Color(0xFF9CC6FF)
 
+/**
+ * "You are there." Green, not `primary`.
+ *
+ * The original spec put the scheme's primary at the centre of the meter, which is prettier and
+ * says nothing: on a blue wallpaper it lands next to the sharp accent, so the one state the user
+ * is actually hunting for looks like the state next to it. Green is the only colour that means
+ * correct without being read, and it is worth breaking dynamic colour for exactly one signal.
+ */
+val ColorScheme.inTuneAccent: Color
+    get() = if (isLight) Color(0xFF1B7A3E) else Color(0xFF7BE3A3)
+
 /** A scheme is light when its surface is bright; there is no flag on ColorScheme itself. */
 private val ColorScheme.isLight: Boolean
     get() = surface.luminance() > 0.5f

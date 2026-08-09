@@ -8,18 +8,25 @@ import android.os.CombinedVibration
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.util.Log
 import nl.markmaaktmedia.guitartuner.R
 
 /**
  * The haptic and the chime that fire when a string locks in.
  *
- * Two things worth knowing:
+ * ## Why the chime was inaudible
  *
- * - The chime is a G6 into a C7. Both sit far above the detector's ~420 Hz ceiling, so the sound
- *   leaving the speaker can never be picked up by the microphone and mistaken for a string. That
- *   is cheaper and more reliable than muting detection for a few hundred milliseconds.
- * - The haptic is a two primitive composition (a click followed by a lighter tick) rather than a
- *   flat buzz, so it reads as "done" instead of "error" on devices with a decent actuator.
+ * It was published on `USAGE_ASSISTANCE_SONIFICATION`, which routes to the system/notification
+ * stream. That stream sits at zero on any phone kept on silent or vibrate, which is most phones,
+ * and the media volume the user has turned up does nothing for it. It now plays as media, which
+ * is the stream someone tuning a guitar has audible by definition.
+ *
+ * The second problem was a race: `SoundPool.load` is asynchronous and the first tuned string can
+ * easily arrive before decoding finishes, in which case `play` is a silent no-op. The load result
+ * is now tracked so a chime that is not ready yet is skipped knowingly rather than swallowed.
+ *
+ * The chime itself is a G6 into a C7. Both sit far above the detector's ~420 Hz ceiling, so the
+ * sound leaving the speaker can never be picked up by the microphone and mistaken for a string.
  */
 class TunerFeedback(context: Context) {
 
@@ -27,13 +34,23 @@ class TunerFeedback(context: Context) {
         .setMaxStreams(2)
         .setAudioAttributes(
             AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                .setUsage(AudioAttributes.USAGE_MEDIA)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                 .build(),
         )
         .build()
 
-    private val chimeId = soundPool.load(context, R.raw.string_tuned, 1)
+    @Volatile
+    private var chimeReady = false
+
+    private val chimeId = soundPool
+        .also { pool ->
+            pool.setOnLoadCompleteListener { _, _, status ->
+                chimeReady = status == 0
+                if (!chimeReady) Log.w(TAG, "Chime failed to load, status $status")
+            }
+        }
+        .load(context, R.raw.string_tuned, 1)
 
     private val vibratorManager: VibratorManager? =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -46,7 +63,11 @@ class TunerFeedback(context: Context) {
         ?: @Suppress("DEPRECATION") context.getSystemService(Vibrator::class.java)
 
     fun stringTuned() {
-        soundPool.play(chimeId, 0.55f, 0.55f, 1, 0, 1f)
+        if (chimeReady) {
+            soundPool.play(chimeId, 1f, 1f, 1, 0, 1f)
+        } else {
+            Log.i(TAG, "Chime not decoded yet, skipping")
+        }
         playSuccessHaptic()
     }
 
@@ -82,5 +103,9 @@ class TunerFeedback(context: Context) {
 
     fun release() {
         soundPool.release()
+    }
+
+    private companion object {
+        const val TAG = "TunerFeedback"
     }
 }

@@ -1,32 +1,41 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  An eighth note, matched to the MarkMySteps compass mark so the two read as one family.
+  An eighth note, matched to the MarkMySteps compass mark.
 
-  The numbers are measured, not guessed. That icon's foreground is 432px at xxxhdpi, its artwork
-  is a 153px square dead centre, and its stroke is 29.5px. Scaled into this 108 unit viewport
-  that is a 38 unit mark with a 7.4 unit stroke. The first version here was 6.05 units, which is
-  18 percent thinner, and its artwork was off centre by about a unit.
+  The previous version matched that icon's stroke ratio exactly (7.4 units of stroke on a 38 unit
+  mark, both measured off its 432px foreground) and still read as heavier. Matching stroke width
+  does not match perceived weight when the two marks distribute their ink differently: the compass
+  is a large thin ring, so its ink is spread around a wide outline, while a solid note head packs
+  the same ink into one dense blob.
 
-  Everything below is in final viewport units so the centring can be read off directly: the
-  visible bounds, half strokes and round caps included, run 36.9..71.1 across and 34.4..73.6
-  down. Both centre on 54.
+  So this version is more linear rather than lighter overall. The stroke comes down to 6.2, the
+  head is a slanted ellipse at real notation proportions instead of a circle, and the stem is
+  longer. Total ink is about 450 square units against the compass's 960, but it reads as the same
+  weight because none of it is concentrated.
 
-  The head is filled rather than stroked. A hollow head is a half note.
+  Coordinates are final viewport units so the centring can be read off the file: visible bounds,
+  half strokes and round caps included, run 39.25..68.75 across and 32.65..75.35 down. Both
+  centre on 54, inside the 66 unit safe zone.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Note head. -->
-    <path
-        android:pathData="M45.9,64.6 m-9,0 a9,9 0 1,0 18,0 a9,9 0 1,0 -18,0"
-        android:fillColor="#E8613C" />
+    <!-- Note head: slanted, because a real one is. A circle reads as a lollipop. -->
+    <group
+        android:pivotX="46.65"
+        android:pivotY="69.25"
+        android:rotation="-20">
+        <path
+            android:pathData="M46.65,69.25 m-7.6,0 a7.6,5.8 0 1,0 15.2,0 a7.6,5.8 0 1,0 -15.2,0"
+            android:fillColor="#E8613C" />
+    </group>
     <!-- Stem and flag in one stroke. -->
     <path
-        android:pathData="M54.4,64.6 L54.4,38.1 C61.5,39.5 66.5,43.5 67.4,50.1"
+        android:pathData="M53.65,67.25 L53.65,35.75 C60.65,37.25 65.15,41.25 65.65,47.75"
         android:strokeColor="#E8613C"
-        android:strokeWidth="7.4"
+        android:strokeWidth="6.2"
         android:strokeLineCap="round"
         android:strokeLineJoin="round" />
 </vector>

@@ -49,6 +49,7 @@ import nl.markmaaktmedia.guitartuner.R
 import nl.markmaaktmedia.guitartuner.domain.model.TuningReading
 import nl.markmaaktmedia.guitartuner.domain.model.TuningStatus
 import nl.markmaaktmedia.guitartuner.ui.theme.flatAccent
+import nl.markmaaktmedia.guitartuner.ui.theme.inTuneAccent
 import nl.markmaaktmedia.guitartuner.ui.theme.sharpAccent
 
 /**
@@ -142,7 +143,7 @@ fun TuningVisualizer(
 
                 val live = lerp(
                     if (here < 0f) colors.flatAccent else colors.sharpAccent,
-                    colors.primary,
+                    colors.inTuneAccent,
                     near,
                 )
 

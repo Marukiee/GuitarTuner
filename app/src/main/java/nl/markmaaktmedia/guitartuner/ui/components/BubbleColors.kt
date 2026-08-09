@@ -5,6 +5,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 import nl.markmaaktmedia.guitartuner.ui.theme.flatAccent
+import nl.markmaaktmedia.guitartuner.ui.theme.inTuneAccent
 import nl.markmaaktmedia.guitartuner.ui.theme.sharpAccent
 import kotlin.math.abs
 
@@ -22,7 +23,7 @@ import kotlin.math.abs
  */
 internal fun bubbleFill(cents: Float, colors: ColorScheme): Color = lerp(
     if (cents < 0f) colors.flatAccent else colors.sharpAccent,
-    colors.primary,
+    colors.inTuneAccent,
     closenessOf(cents),
 )
 

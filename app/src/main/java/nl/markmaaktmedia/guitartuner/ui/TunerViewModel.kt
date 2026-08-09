@@ -12,7 +12,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import nl.markmaaktmedia.guitartuner.audio.AudioCaptureSource
@@ -29,6 +33,7 @@ import nl.markmaaktmedia.guitartuner.domain.model.TunerEvent
 import nl.markmaaktmedia.guitartuner.domain.model.ThemeMode
 import nl.markmaaktmedia.guitartuner.domain.model.TunerUiState
 import nl.markmaaktmedia.guitartuner.domain.model.TuningReading
+import nl.markmaaktmedia.guitartuner.domain.model.TuningStatus
 
 /**
  * The state is deliberately split in three.
@@ -76,6 +81,20 @@ class TunerViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _events = MutableSharedFlow<TunerEvent>(extraBufferCapacity = 4)
     val events: SharedFlow<TunerEvent> = _events.asSharedFlow()
+
+    /**
+     * Is the string being listened to in tune *right now*?
+     *
+     * Separate from [reading] and deliberately a Boolean. The headstock needs live feedback (the
+     * active peg turns green the moment you hit the note, not half a second later when the hold
+     * completes), but it must not recompose 21 times a second to get it. Collapsing to a Boolean
+     * and running it through `distinctUntilChanged` means the headstock recomposes a couple of
+     * times per string instead of a couple of hundred.
+     */
+    val inTuneNow: StateFlow<Boolean> = _reading
+        .map { it != null && it.status == TuningStatus.IN_TUNE && it.clarity >= 0.8f }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     private var listenJob: Job? = null
 

@@ -33,11 +33,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import nl.markmaaktmedia.guitartuner.domain.model.HeadstockLayout
 import nl.markmaaktmedia.guitartuner.domain.model.Instrument
+import nl.markmaaktmedia.guitartuner.ui.theme.inTuneAccent
 
-private enum class Side { LEFT, RIGHT }
+internal enum class Side { LEFT, RIGHT }
 
 /** Where one peg sits: which side of the headstock, and how far down that side. */
-private data class PegSlot(
+internal data class PegSlot(
     val physicalIndex: Int,
     val side: Side,
     val slot: Int,
@@ -62,7 +63,7 @@ private data class PegSlot(
  * So: the left column is always reversed against string order, the right column never is. An
  * earlier version had both backwards, which any guitarist spots instantly.
  */
-private fun slotsFor(instrument: Instrument): List<PegSlot> {
+internal fun slotsFor(instrument: Instrument): List<PegSlot> {
     val count = instrument.stringCount
     val leftCount = when (instrument.layout) {
         HeadstockLayout.THREE_PER_SIDE -> 3
@@ -105,6 +106,8 @@ fun HeadstockView(
     instrument: Instrument,
     activeIndex: Int,
     tunedIndices: Set<Int>,
+    /** True while the string being listened to is in tune right now, not once the hold completes. */
+    inTuneNow: Boolean,
     onPegSelected: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -184,6 +187,7 @@ fun HeadstockView(
                 val postY = slotY(slot).toPx()
 
                 val color = when {
+                    active && inTuneNow -> colors.inTuneAccent
                     active -> colors.primary
                     tuned -> colors.tertiary.copy(alpha = 0.75f)
                     else -> colors.onSurfaceVariant.copy(alpha = 0.42f)
@@ -225,6 +229,7 @@ fun HeadstockView(
             PegButton(
                 label = instrument.strings[slot.physicalIndex].label,
                 isActive = slot.physicalIndex == activeIndex,
+                isInTuneNow = inTuneNow && slot.physicalIndex == activeIndex,
                 isTuned = slot.physicalIndex in tunedIndices,
                 onClick = { onPegSelected(slot.physicalIndex) },
                 modifier = Modifier
@@ -246,6 +251,7 @@ fun HeadstockView(
 private fun PegButton(
     label: String,
     isActive: Boolean,
+    isInTuneNow: Boolean,
     isTuned: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -254,6 +260,9 @@ private fun PegButton(
 
     val container by animateColorAsState(
         targetValue = when {
+            // Live, not on completion. The spring makes it bleed in and out as the note drifts,
+            // which turns the peg into a second read-out rather than a status light.
+            isInTuneNow -> colors.inTuneAccent
             isActive -> colors.primary
             isTuned -> colors.tertiaryContainer
             // Not a surface role: against a surface-coloured body an inactive peg in
@@ -265,6 +274,7 @@ private fun PegButton(
     )
     val content by animateColorAsState(
         targetValue = when {
+            isInTuneNow -> contentColorOn(colors.inTuneAccent)
             isActive -> colors.onPrimary
             isTuned -> colors.onTertiaryContainer
             else -> colors.onSecondaryContainer
@@ -273,7 +283,7 @@ private fun PegButton(
         label = "pegContent",
     )
     val scale by animateFloatAsState(
-        targetValue = if (isActive) 1.14f else 1f,
+        targetValue = if (isInTuneNow) 1.24f else if (isActive) 1.14f else 1f,
         // Bouncy on purpose: the peg the tuner jumps to should feel like it snapped into place.
         animationSpec = spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessMedium),
         label = "pegScale",
