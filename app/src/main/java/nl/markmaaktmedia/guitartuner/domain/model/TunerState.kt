@@ -81,6 +81,8 @@ data class TunerUiState(
     /** True once the user has chosen a source by hand, which stops the automatic fallback. */
     val micSourcePinned: Boolean = false,
     val themeMode: ThemeMode = ThemeMode.System,
+    /** Developer option: force the update banner on so it can be inspected without a release. */
+    val bannerPreview: Boolean = false,
 ) {
     val activeString: TuningString
         get() = instrument.strings.getOrElse(activeStringIndex) { instrument.strings.first() }

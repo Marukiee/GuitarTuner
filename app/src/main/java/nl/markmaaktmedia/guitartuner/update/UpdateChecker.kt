@@ -22,6 +22,16 @@ data class UpdateStatus(
     val currentVersionCode: Long,
     val latest: AppRelease?,
     val isNewer: Boolean,
+    /**
+     * Why the check produced nothing, in words, or null if it succeeded.
+     *
+     * The banner is allowed to fail silently, because a failed update check is not worth
+     * interrupting anyone over. Settings is not: "no banner appeared" has three completely
+     * different causes (already up to date, no network, GitHub rate limited) and without this
+     * they are indistinguishable from outside the app, which is exactly the hole that made this
+     * take three attempts to pin down.
+     */
+    val error: String? = null,
 )
 
 /**
@@ -57,7 +67,9 @@ class UpdateChecker(private val context: Context) {
     suspend fun check(ignoreDismissed: Boolean = false, fresh: Boolean = false): UpdateStatus =
         withContext(Dispatchers.IO) {
             val current = currentVersionCode
-            val latest = fetchLatest(fresh) ?: return@withContext UpdateStatus(current, null, false)
+            lastError = null
+            val latest = fetchLatest(fresh)
+                ?: return@withContext UpdateStatus(current, null, false, lastError ?: "No release found")
 
             val dismissed = prefs.getLong(KEY_DISMISSED, -1L)
             val isNewer = latest.versionCode > current &&
@@ -66,16 +78,25 @@ class UpdateChecker(private val context: Context) {
             UpdateStatus(current, latest, isNewer)
         }
 
+    /** Human readable installed version, for the Settings row. */
+    val currentVersionName: String
+        get() = runCatching {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?"
+        }.getOrElse { "?" }
+
     /** Do not nag about this build again. Remembered per version, exactly like MarkMySteps. */
     fun dismiss(versionCode: Long) {
         prefs.edit().putLong(KEY_DISMISSED, versionCode).apply()
     }
 
+    /** Set by [fetchLatest] so [check] can report why it came back empty. */
+    private var lastError: String? = null
+
     private fun fetchLatest(fresh: Boolean): AppRelease? {
         if (!fresh) {
             val cachedAt = prefs.getLong(KEY_CACHED_AT, 0L)
             if (System.currentTimeMillis() - cachedAt < CACHE_TTL_MS) {
-                return prefs.getString(KEY_CACHED_JSON, null)?.let(::parse)
+                return prefs.getString(KEY_CACHED_JSON, null)?.let(ReleaseParser::parse)
             }
         }
 
@@ -89,6 +110,8 @@ class UpdateChecker(private val context: Context) {
             }
             try {
                 if (connection.responseCode != HttpURLConnection.HTTP_OK) {
+                    // 403 here is almost always the anonymous rate limit, 60 per hour per IP.
+                    lastError = "GitHub returned HTTP ${connection.responseCode}"
                     Log.i(TAG, "Release check returned HTTP ${connection.responseCode}")
                     return@runCatching null
                 }
@@ -97,12 +120,18 @@ class UpdateChecker(private val context: Context) {
                 connection.disconnect()
             }
         }.getOrElse {
-            // Offline, or no release published yet. Silent: an update banner is not worth an error.
+            // Offline, DNS down, or the INTERNET permission missing from the manifest, which is
+            // exactly what this used to swallow.
+            lastError = it::class.java.simpleName + ": " + (it.message ?: "no detail")
             Log.i(TAG, "Release check failed: ${it.message}")
             null
         } ?: return null
 
-        val release = parse(body) ?: return null
+        val release = ReleaseParser.parse(body)
+        if (release == null) {
+            lastError = "Latest release has no APK asset, or its tag is not a build number"
+            return null
+        }
         prefs.edit()
             .putString(KEY_CACHED_JSON, body)
             .putLong(KEY_CACHED_AT, System.currentTimeMillis())
@@ -110,32 +139,6 @@ class UpdateChecker(private val context: Context) {
         return release
     }
 
-    private fun parse(json: String): AppRelease? = runCatching {
-        val root = JSONObject(json)
-        if (root.optBoolean("draft") || root.optBoolean("prerelease")) return null
-
-        // Tags are "v<run_number>"; the run number is also the versionCode.
-        val tag = root.optString("tag_name").removePrefix("v")
-        val versionCode = tag.toLongOrNull() ?: return null
-
-        val assets = root.optJSONArray("assets") ?: return null
-        var apkUrl: String? = null
-        for (i in 0 until assets.length()) {
-            val asset = assets.getJSONObject(i)
-            val url = asset.optString("browser_download_url")
-            if (url.endsWith(".apk", ignoreCase = true)) {
-                apkUrl = url
-                break
-            }
-        }
-
-        AppRelease(
-            versionCode = versionCode,
-            name = root.optString("name").ifBlank { "Build $versionCode" },
-            notes = root.optString("body").takeIf { it.isNotBlank() }?.lineSequence()?.first()?.trim(),
-            apkUrl = apkUrl ?: return null,
-        )
-    }.getOrNull()
 
     private companion object {
         const val TAG = "UpdateChecker"
@@ -149,4 +152,42 @@ class UpdateChecker(private val context: Context) {
         const val RELEASES_URL =
             "https://api.github.com/repos/Marukiee/GuitarTuner/releases/latest"
     }
+}
+
+/**
+ * Turning a `releases/latest` payload into an [AppRelease], deliberately free of any Android
+ * dependency.
+ *
+ * It lived inside [UpdateChecker] and could not be tested there: the class needs a Context for
+ * SharedPreferences, so a unit test could only construct it behind an assumption, and the whole
+ * suite silently skipped. Four green-looking skipped tests are worse than no tests.
+ */
+internal object ReleaseParser {
+
+internal fun parse(json: String): AppRelease? = runCatching {
+    val root = JSONObject(json)
+    if (root.optBoolean("draft") || root.optBoolean("prerelease")) return null
+
+    // Tags are "v<run_number>"; the run number is also the versionCode.
+    val tag = root.optString("tag_name").removePrefix("v")
+    val versionCode = tag.toLongOrNull() ?: return null
+
+    val assets = root.optJSONArray("assets") ?: return null
+    var apkUrl: String? = null
+    for (i in 0 until assets.length()) {
+        val asset = assets.getJSONObject(i)
+        val url = asset.optString("browser_download_url")
+        if (url.endsWith(".apk", ignoreCase = true)) {
+            apkUrl = url
+            break
+        }
+    }
+
+    AppRelease(
+        versionCode = versionCode,
+        name = root.optString("name").ifBlank { "Build $versionCode" },
+        notes = root.optString("body").takeIf { it.isNotBlank() }?.lineSequence()?.first()?.trim(),
+        apkUrl = apkUrl ?: return null,
+    )
+}.getOrNull()
 }

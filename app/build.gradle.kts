@@ -124,6 +124,9 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 
     testImplementation(libs.junit)
+    // The real org.json, so parsing is actually exercised in unit tests instead of hitting the
+    // stubbed framework classes that return defaults.
+    testImplementation(libs.json)
     testImplementation(libs.kotlinx.coroutines.test)
 
     androidTestImplementation(libs.androidx.test.junit)

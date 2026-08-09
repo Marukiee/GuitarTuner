@@ -68,6 +68,8 @@ fun SettingsScreen(
     onMicSource: (MicSource) -> Unit,
     onThemeMode: (ThemeMode) -> Unit,
     onReferenceHz: (Float) -> Unit,
+    bannerPreview: Boolean,
+    onBannerPreview: (Boolean) -> Unit,
     onBack: () -> Unit,
     versionName: String,
     modifier: Modifier = Modifier,
@@ -180,12 +182,10 @@ fun SettingsScreen(
                 }
             }
 
-            Text(
-                text = "Guitar Tuner $versionName",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp),
+            UpdatesGroup(
+                versionName = versionName,
+                bannerPreview = bannerPreview,
+                onBannerPreview = onBannerPreview,
             )
         }
     }

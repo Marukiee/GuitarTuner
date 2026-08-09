@@ -72,7 +72,10 @@ class MainActivity : ComponentActivity() {
                     Box(Modifier.fillMaxSize()) {
                         AppContent(viewModel)
                         // Floats over the screen instead of pushing it down, same as MarkMySteps.
-                        UpdateBanner(Modifier.align(Alignment.TopCenter))
+                        UpdateBanner(
+                            modifier = Modifier.align(Alignment.TopCenter),
+                            forceShow = state.bannerPreview,
+                        )
                     }
                 }
             }
@@ -159,6 +162,8 @@ private fun AppContent(viewModel: TunerViewModel) {
                 onMicSource = viewModel::setMicSource,
                 onThemeMode = viewModel::setThemeMode,
                 onReferenceHz = viewModel::setReferencePitch,
+                bannerPreview = state.bannerPreview,
+                onBannerPreview = viewModel::setBannerPreview,
                 onBack = { showSettings = false },
                 versionName = BuildConfig.VERSION_NAME,
             )

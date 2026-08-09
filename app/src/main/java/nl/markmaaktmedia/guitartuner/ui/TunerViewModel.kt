@@ -68,6 +68,7 @@ class TunerViewModel(application: Application) : AndroidViewModel(application) {
             // A stored source is a deliberate choice, so the automatic fallback stays out of it.
             micSourcePinned = true,
             themeMode = preferences.themeMode,
+            bannerPreview = preferences.bannerPreview,
         ),
     )
     val uiState: StateFlow<TunerUiState> = _uiState.asStateFlow()
@@ -146,6 +147,11 @@ class TunerViewModel(application: Application) : AndroidViewModel(application) {
         val clamped = hz.coerceIn(400f, 480f)
         preferences.referenceHz = clamped
         _uiState.update { it.copy(referenceHz = clamped) }
+    }
+
+    fun setBannerPreview(enabled: Boolean) {
+        preferences.bannerPreview = enabled
+        _uiState.update { it.copy(bannerPreview = enabled) }
     }
 
     fun setThemeMode(mode: ThemeMode) {

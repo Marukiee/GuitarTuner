@@ -44,6 +44,11 @@ class TunerPreferences(context: Context) {
             ?: ThemeMode.System
         set(value) = prefs.edit().putString(KEY_THEME, value.name).apply()
 
+    /** Developer option: render the update banner with dummy content so it can be checked. */
+    var bannerPreview: Boolean
+        get() = prefs.getBoolean(KEY_BANNER_PREVIEW, false)
+        set(value) = prefs.edit().putBoolean(KEY_BANNER_PREVIEW, value).apply()
+
     var referenceHz: Float
         get() = prefs.getFloat(KEY_REFERENCE, Note.STANDARD_REFERENCE_HZ)
         set(value) = prefs.edit().putFloat(KEY_REFERENCE, value).apply()
@@ -54,5 +59,6 @@ class TunerPreferences(context: Context) {
         const val KEY_MIC_SOURCE = "mic_source"
         const val KEY_THEME = "theme_mode"
         const val KEY_REFERENCE = "reference_hz"
+        const val KEY_BANNER_PREVIEW = "banner_preview"
     }
 }
