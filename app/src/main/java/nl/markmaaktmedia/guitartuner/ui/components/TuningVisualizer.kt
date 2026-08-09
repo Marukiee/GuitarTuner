@@ -11,6 +11,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -111,25 +112,35 @@ fun TuningVisualizer(
     }
 
     Column(modifier, verticalArrangement = Arrangement.Center) {
-        Box(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
-            contentAlignment = Alignment.Center,
         ) {
+            // Geometry is computed once, here, and shared by the canvas and the readout.
+            //
+            // It used to be worked out twice, and the two copies disagreed. The readout derived
+            // its travel inside a graphicsLayer block, where `size` is the size of the node the
+            // modifier sits on, which was the small box wrapping the text rather than the canvas.
+            // `size.width / 2 - 70.dp` came out negative on that box, so the number slid the
+            // opposite way to the bubble it was supposed to be printed on. The two centres did
+            // not agree vertically either.
+            val bubbleRadius = 52.dp
+            val tickGap = 28.dp
+            val centreYDp = (maxHeight - tickGap) / 2f
+            val travelDp = maxWidth / 2f - bubbleRadius - 10.dp
+
+            val travel = with(density) { travelDp.toPx() }
+            val centreY = with(density) { centreYDp.toPx() }
+            val radius = with(density) { bubbleRadius.toPx() }
+
             Canvas(Modifier.fillMaxSize()) {
                 val centreX = size.width / 2f
-                val bubbleRadius = with(density) { 52.dp.toPx() }
-                val tickGap = with(density) { 28.dp.toPx() }
-                // The bubble sits above the scale rather than in the middle of a tall empty box:
-                // the two have to read as one instrument, not as two unrelated graphics.
-                val centreY = (size.height - tickGap) / 2f
-                val travel = centreX - bubbleRadius - with(density) { 10.dp.toPx() }
 
                 drawScale(
                     centreX = centreX,
-                    tickY = centreY + bubbleRadius + tickGap,
-                    lineTop = centreY - bubbleRadius - with(density) { 20.dp.toPx() },
+                    tickY = centreY + radius + with(density) { tickGap.toPx() },
+                    lineTop = centreY - radius - with(density) { 20.dp.toPx() },
                     travel = travel,
                     tickColor = colors.onSurfaceVariant.copy(alpha = 0.38f),
                     trackColor = colors.onSurfaceVariant.copy(alpha = 0.12f),
@@ -158,7 +169,7 @@ fun TuningVisualizer(
                 // Off target the bubble is a slowly turning cookie; on target it settles into a
                 // still circle and swells slightly, which is the "locked on" cue.
                 val path = morph.toPath(progress = near).asComposePath()
-                val scale = bubbleRadius * (0.92f + 0.08f * near)
+                val scale = radius * (0.92f + 0.08f * near)
                 path.transform(
                     Matrix().apply {
                         translate(centreX + here * travel, centreY)
@@ -170,16 +181,19 @@ fun TuningVisualizer(
                 drawPath(path, bubbleColor)
             }
 
-            // The readout rides along with the bubble. translationX is a draw-phase property, so
-            // moving it does not relayout the text.
+            // The readout rides along with the bubble, off the same numbers. Both translations
+            // are draw-phase properties, so moving it neither recomposes nor relayouts.
             Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        translationX = offset.value * travel
+                        translationY = centreY - size.height / 2f
+                        // Fade the number out entirely at rest; a "0" with nothing playing is a lie.
+                        alpha = ((presence.value - IDLE_PRESENCE) / (1f - IDLE_PRESENCE))
+                            .coerceIn(0f, 1f)
+                    },
                 contentAlignment = Alignment.Center,
-                modifier = Modifier.graphicsLayer {
-                    val travel = size.width / 2f - with(density) { 70.dp.toPx() }
-                    translationX = offset.value * travel
-                    // Fade the number out entirely at rest; a "0" with nothing playing is a lie.
-                    alpha = ((presence.value - IDLE_PRESENCE) / (1f - IDLE_PRESENCE)).coerceIn(0f, 1f)
-                },
             ) {
                 CentsReadout(reading)
             }

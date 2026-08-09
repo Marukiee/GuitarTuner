@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -28,9 +29,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
 import nl.markmaaktmedia.guitartuner.domain.model.Instrument
@@ -56,15 +57,24 @@ fun InstrumentButton(
         shape = RoundedCornerShape(percent = 50),
         color = MaterialTheme.colorScheme.surfaceContainerHighest,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        modifier = modifier,
+        modifier = modifier.height(PillHeight),
     ) {
         Row(
-            modifier = Modifier.padding(start = 10.dp, end = 14.dp, top = 8.dp, bottom = 8.dp),
+            modifier = Modifier.padding(start = 12.dp, end = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(9.dp),
         ) {
-            HeadstockGlyph(selected, Modifier.size(26.dp))
-            Text(selected.displayName, style = MaterialTheme.typography.titleMedium)
+            HeadstockGlyph(selected, Modifier.size(22.dp))
+            Text(
+                text = selected.displayName,
+                style = MaterialTheme.typography.titleMedium,
+                // The label used to wrap: the pill was fighting a competing weight in the row and
+                // got squeezed until "Acoustic" broke across two lines inside a rounded capsule.
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
             Icon(
                 Icons.Rounded.ExpandMore,
                 contentDescription = null,
@@ -153,6 +163,9 @@ private fun InstrumentRow(
     }
 }
 
+/** Every control in the top bar is this tall, so the row reads as one strip. */
+val PillHeight = 44.dp
+
 private val GROUP_OUTER = 22.dp
 private val GROUP_INNER = 6.dp
 
@@ -163,58 +176,48 @@ private fun groupShape(index: Int, count: Int): Shape {
 }
 
 /**
- * A miniature of the headstock this instrument actually gets, drawn from the same peg layout the
- * full component uses.
+ * A miniature fretboard: the nut, and one line per string with the gauge running thick to thin.
  *
- * The alternative was a literal picture of each instrument, and that would have looked like
- * clip art: there is no Material icon for "ukulele", six little guitar silhouettes at 26dp are
- * indistinguishable from each other, and drawing them properly would fight the flat vector
- * language of the rest of the app. An abstract peg pattern is honest about what actually differs
- * between the options, which is the number of strings and where the pegs sit, and it stays
- * legible at button size.
+ * The first attempt drew the headstock outline with a dot per peg, and at 26dp that read as a
+ * dice face or a TV remote rather than an instrument. Strings are the thing that actually differs
+ * between these options, they are what the user is about to tune, and parallel lines of varying
+ * weight survive being shrunk in a way that a peg pattern does not.
+ *
+ * Literal pictures of each instrument were the other option and would have been worse: there is
+ * no Material icon for "ukulele", and six guitar silhouettes at this size are indistinguishable.
  */
 @Composable
 fun HeadstockGlyph(instrument: Instrument, modifier: Modifier = Modifier) {
-    val outline = MaterialTheme.colorScheme.onSurfaceVariant
-    val slots = remember(instrument) { slotsFor(instrument) }
-    val hasRight = slots.any { it.side == Side.RIGHT }
+    val tint = MaterialTheme.colorScheme.onSurfaceVariant
+    val count = instrument.stringCount
 
     Canvas(modifier) {
-        val bodyWidth = size.width * if (hasRight) 0.62f else 0.46f
-        val bodyLeft = (size.width - bodyWidth) / 2f +
-            if (hasRight) 0f else size.width * 0.08f
-        val bodyTop = size.height * 0.06f
-        val bodyHeight = size.height * 0.70f
+        val inset = size.width * 0.14f
+        val innerWidth = size.width - inset * 2f
+        val nutY = size.height * 0.17f
+        val unit = size.minDimension
 
-        drawRoundRect(
-            color = outline.copy(alpha = 0.30f),
-            topLeft = Offset(bodyLeft, bodyTop),
-            size = Size(bodyWidth, bodyHeight),
-            cornerRadius = CornerRadius(bodyWidth * 0.34f, bodyWidth * 0.34f),
-        )
-        // Neck stub, so the glyph reads as a headstock rather than a rounded rectangle.
-        drawRoundRect(
-            color = outline.copy(alpha = 0.30f),
-            topLeft = Offset(size.width / 2f - size.width * 0.09f, bodyTop + bodyHeight - 2f),
-            size = Size(size.width * 0.18f, size.height - bodyTop - bodyHeight + 2f),
-            cornerRadius = CornerRadius(2f, 2f),
+        // The nut, so the lines read as a fretboard rather than as a bar chart.
+        drawLine(
+            color = tint,
+            start = Offset(inset - unit * 0.03f, nutY),
+            end = Offset(size.width - inset + unit * 0.03f, nutY),
+            strokeWidth = unit * 0.10f,
+            cap = StrokeCap.Round,
         )
 
-        val dot = size.minDimension * 0.075f
-        val bandTop = bodyTop + bodyHeight * 0.16f
-        val bandHeight = bodyHeight * 0.60f
-
-        slots.forEach { slot ->
-            val x = when (slot.side) {
-                Side.LEFT -> bodyLeft + bodyWidth * 0.18f
-                Side.RIGHT -> bodyLeft + bodyWidth * 0.82f
-            }
-            val y = if (slot.slotsOnSide <= 1) {
-                bandTop + bandHeight / 2f
-            } else {
-                bandTop + bandHeight * (slot.slot.toFloat() / (slot.slotsOnSide - 1))
-            }
-            drawCircle(color = outline, radius = dot, center = Offset(x, y))
+        val step = if (count > 1) innerWidth / (count - 1) else 0f
+        for (i in 0 until count) {
+            val x = if (count > 1) inset + step * i else size.width / 2f
+            // Thick on the left, thin on the right, exactly like a real set.
+            val gauge = unit * (0.075f - 0.035f * (i.toFloat() / (count - 1).coerceAtLeast(1)))
+            drawLine(
+                color = tint.copy(alpha = 0.85f),
+                start = Offset(x, nutY),
+                end = Offset(x, size.height * 0.96f),
+                strokeWidth = gauge,
+                cap = StrokeCap.Round,
+            )
         }
     }
 }

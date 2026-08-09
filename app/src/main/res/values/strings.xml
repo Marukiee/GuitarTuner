@@ -2,6 +2,7 @@
 <resources>
     <string name="app_name">Guitar Tuner</string>
     <string name="auto_mode">Auto</string>
+    <string name="manual_mode">Manual</string>
     <string name="tune_up">Tune up</string>
     <string name="tune_down">Tune down</string>
     <string name="in_tune">In tune</string>

@@ -1,23 +1,28 @@
 package nl.markmaaktmedia.guitartuner.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -35,6 +40,7 @@ import nl.markmaaktmedia.guitartuner.R
 import nl.markmaaktmedia.guitartuner.domain.model.Instrument
 import nl.markmaaktmedia.guitartuner.ui.components.HeadstockView
 import nl.markmaaktmedia.guitartuner.ui.components.InstrumentButton
+import nl.markmaaktmedia.guitartuner.ui.components.PillHeight
 import nl.markmaaktmedia.guitartuner.ui.components.InputLevelBar
 import nl.markmaaktmedia.guitartuner.ui.components.TuningVisualizer
 
@@ -129,9 +135,10 @@ fun TunerScreen(
 /**
  * What you are tuning, whether it tracks automatically, and the way into Settings.
  *
- * The scrolling chip row this replaces could never fit six instruments, so one was always sliced
- * off at the fade edge, and a row of competing pills above the meter was noise around the thing
- * being read. One button now states the instrument and opens a sheet to change it.
+ * All three controls are the same height and sit in one row with a single weight on the
+ * instrument pill. The previous version gave the pill `weight(1f, fill = false)` *and* put a
+ * `Spacer(weight(1f))` next to it, so the two split the free space and the pill was squeezed
+ * until "Acoustic" wrapped onto a second line inside a rounded capsule.
  */
 @Composable
 private fun InstrumentBar(
@@ -150,31 +157,81 @@ private fun InstrumentBar(
         InstrumentButton(
             selected = selected,
             onSelect = onSelect,
-            modifier = Modifier.weight(1f, fill = false),
+            modifier = Modifier.weight(1f),
         )
 
-        Spacer(Modifier.weight(1f))
-
-        FilterChip(
-            selected = autoMode,
-            onClick = { onAutoChange(!autoMode) },
-            label = { Text(stringResource(R.string.auto_mode)) },
-            shape = RoundedCornerShape(percent = 50),
-            leadingIcon = if (autoMode) {
-                { Icon(Icons.Rounded.Check, contentDescription = null) }
-            } else {
-                null
-            },
-        )
+        AutoPill(checked = autoMode, onCheckedChange = onAutoChange)
 
         FilledIconButton(
             onClick = onOpenSettings,
+            shape = CircleShape,
             colors = IconButtonDefaults.filledIconButtonColors(
                 containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                 contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
             ),
+            modifier = Modifier.size(PillHeight),
         ) {
             Icon(Icons.Rounded.Tune, contentDescription = "Settings")
+        }
+    }
+}
+
+/**
+ * Auto-detect on or off.
+ *
+ * A FilterChip was the wrong control: it is shorter than everything beside it, its selected state
+ * is a faint tint, and "Auto" with no visible state tells you nothing about whether it is on. This
+ * fills solid when active, carries a check that animates in, and states the mode in words when it
+ * is off, which is the only time the word is ambiguous.
+ */
+@Composable
+private fun AutoPill(checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    val container by animateColorAsState(
+        targetValue = if (checked) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerHighest
+        },
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "autoContainer",
+    )
+    val content by animateColorAsState(
+        targetValue = if (checked) {
+            MaterialTheme.colorScheme.onPrimary
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "autoContent",
+    )
+
+    Surface(
+        onClick = { onCheckedChange(!checked) },
+        shape = CircleShape,
+        color = container,
+        contentColor = content,
+        modifier = Modifier.height(PillHeight).animateContentSize(
+            spring(stiffness = Spring.StiffnessMediumLow),
+        ),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            AnimatedVisibility(visible = checked) {
+                Icon(
+                    Icons.Rounded.Check,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+            Text(
+                text = stringResource(if (checked) R.string.auto_mode else R.string.manual_mode),
+                style = MaterialTheme.typography.labelLarge,
+                maxLines = 1,
+                softWrap = false,
+            )
         }
     }
 }
