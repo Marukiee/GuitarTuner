@@ -1,6 +1,13 @@
 package nl.markmaaktmedia.guitartuner.ui.components
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.spring
@@ -141,18 +148,41 @@ fun TuneDial(
             verticalArrangement = Arrangement.spacedBy(2.dp),
             modifier = Modifier.padding(bottom = 12.dp),
         ) {
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text(
-                    text = target.label,
-                    style = NoteDisplayStyle,
-                    color = statusColor,
-                )
-                Text(
-                    text = target.note.octave.toString(),
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = statusColor.copy(alpha = 0.55f),
-                    modifier = Modifier.padding(start = 2.dp, bottom = 14.dp),
-                )
+            // The note slides in the direction the target moved rather than being swapped
+            // in place. Walking E A D G B E is a walk up the instrument, and a letter that
+            // is simply replaced says nothing about which way you went; a letter that rises
+            // says it without a word. The direction comes from the pitch and not from the
+            // peg order, so a re-entrant tuning still moves the way it sounds.
+            AnimatedContent(
+                targetState = target,
+                transitionSpec = {
+                    val rising = targetState.note.midi > initialState.note.midi
+                    val enter = slideInVertically(TunerMotion.spatial()) { height ->
+                        if (rising) height / 2 else -height / 2
+                    } + fadeIn(TunerMotion.fadeSpec())
+                    val exit = slideOutVertically(TunerMotion.spatial()) { height ->
+                        if (rising) -height / 2 else height / 2
+                    } + fadeOut(TunerMotion.fadeSpec())
+                    // Half a line of travel, unclipped. A full height slide has to be
+                    // clipped to stay off the arc, and clipping the biggest glyph on the
+                    // screen makes it look torn rather than moved.
+                    enter togetherWith exit using SizeTransform(clip = false)
+                },
+                label = "note",
+            ) { note ->
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        text = note.label,
+                        style = NoteDisplayStyle,
+                        color = statusColor,
+                    )
+                    Text(
+                        text = note.note.octave.toString(),
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = statusColor.copy(alpha = 0.55f),
+                        modifier = Modifier.padding(start = 2.dp, bottom = 14.dp),
+                    )
+                }
             }
             FrequencyReadout(readings, targetHz)
         }

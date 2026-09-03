@@ -243,7 +243,13 @@ private fun DrawScope.drawHead(
     val h = size.height * factor
     val insetX = (size.width - w) / 2f
     val insetY = size.height - h
-    fun x(fraction: Float) = insetX + fraction * w
+    // Every fraction in a [HeadSpec] is written left to right off a photograph, which is the
+    // front of the instrument: bass side on the left, the way a chord chart is drawn. The head
+    // is then mirrored on the way to the canvas, because this drawing is not a chord chart. It
+    // is shown to someone holding the instrument, and from behind the neck the bass side is on
+    // the right, so an unmirrored head sends the low string off the wrong edge and hangs the
+    // treble strings on the tuners the player can see are not theirs.
+    fun x(fraction: Float) = insetX + (1f - fraction) * w
     fun y(fraction: Float) = insetY + fraction * h
 
     val bottom = spec.headBottom

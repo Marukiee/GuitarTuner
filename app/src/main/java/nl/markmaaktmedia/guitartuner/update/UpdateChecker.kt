@@ -39,7 +39,7 @@ data class UpdateStatus(
 )
 
 /**
- * "Is there a newer APK?" answered straight from the GitHub Releases API.
+ * "Is there a newer APK?" answered straight from GitHub.
  *
  * MarkMySteps routes the same question through its own backend, which caches GitHub's answer.
  * This app has no backend, so it asks GitHub directly and caches locally instead. Anonymous
@@ -47,8 +47,16 @@ data class UpdateStatus(
  * so a [CACHE_TTL_MS] window sits in front of the network call. A manual check passes
  * `fresh = true` to skip it.
  *
- * The CI workflow tags each release `v<run_number>` and sets `versionCode` to the same number,
- * which is what makes the comparison a plain integer compare.
+ * There are two ways to ask, and both are used. The Releases API is the good one: it carries
+ * the release notes and the real asset URL. The plain releases page is the fallback, because
+ * the API lives on its own hostname with its own rate limit, and a phone can be perfectly
+ * online while `api.github.com` specifically is unreachable: a Private DNS profile, an ad
+ * blocking resolver or a VPN app filtering `api.*` will do exactly that, and so will the
+ * hourly limit after a busy afternoon. `github.com/.../releases/latest` answers the same
+ * question with a redirect to `releases/tag/v<n>`, which is all the version compare needs.
+ *
+ * The CI workflow tags each release `v<run_number>`, sets `versionCode` to the same number and
+ * always names the asset [APK_NAME], which is what makes both routes work off a plain integer.
  */
 class UpdateChecker(private val context: Context) {
 
@@ -93,56 +101,94 @@ class UpdateChecker(private val context: Context) {
         prefs.edit().putLong(KEY_DISMISSED, versionCode).apply()
     }
 
-    /** Set by [fetchLatest] so [check] can report why it came back empty. */
+    /** Set by the fetchers so [check] can report why it came back empty. */
     private var lastError: String? = null
 
     private fun fetchLatest(fresh: Boolean): AppRelease? {
         if (!fresh) {
             val cachedAt = prefs.getLong(KEY_CACHED_AT, 0L)
             if (System.currentTimeMillis() - cachedAt < CACHE_TTL_MS) {
-                return prefs.getString(KEY_CACHED_JSON, null)?.let(ReleaseParser::parse)
+                prefs.getString(KEY_CACHED_JSON, null)?.let(ReleaseParser::parse)?.let { return it }
             }
         }
 
-        val body = runCatching {
-            val connection = (URL(RELEASES_URL).openConnection() as HttpURLConnection).apply {
-                requestMethod = "GET"
-                connectTimeout = 8_000
-                readTimeout = 8_000
-                setRequestProperty("Accept", "application/vnd.github+json")
-                setRequestProperty("User-Agent", "GuitarTuner-Android")
+        val body = readApi()
+        if (body != null) {
+            val release = ReleaseParser.parse(body)
+            if (release == null) {
+                lastError = "Latest release has no APK asset, or its tag is not a build number"
+                return null
             }
-            try {
-                if (connection.responseCode != HttpURLConnection.HTTP_OK) {
-                    // 403 here is almost always the anonymous rate limit, 60 per hour per IP.
-                    lastError = "GitHub returned HTTP ${connection.responseCode}"
-                    Log.i(TAG, "Release check returned HTTP ${connection.responseCode}")
-                    return@runCatching null
-                }
-                connection.inputStream.bufferedReader().use { it.readText() }
-            } finally {
-                connection.disconnect()
-            }
-        }.getOrElse {
-            // Offline, DNS down, or the INTERNET permission missing from the manifest, which is
-            // exactly what this used to swallow.
-            lastError = describe(it)
-            Log.i(TAG, "Release check failed: ${it.message}", it)
-            null
-        } ?: return null
-
-        val release = ReleaseParser.parse(body)
-        if (release == null) {
-            lastError = "Latest release has no APK asset, or its tag is not a build number"
-            return null
+            prefs.edit()
+                .putString(KEY_CACHED_JSON, body)
+                .putLong(KEY_CACHED_AT, System.currentTimeMillis())
+                .apply()
+            return release
         }
-        prefs.edit()
-            .putString(KEY_CACHED_JSON, body)
-            .putLong(KEY_CACHED_AT, System.currentTimeMillis())
-            .apply()
-        return release
+
+        // The API host said no, one way or another. That is not the same answer as "there is
+        // no newer build", so ask the other host before reporting a failure. A success here
+        // clears the error the API left behind: the user got their answer, and telling them
+        // about a route they never asked about is noise.
+        return readLatestTag()?.also { lastError = null }
     }
 
+    /** The good answer: release notes and the real asset URL, straight from the API. */
+    private fun readApi(): String? = runCatching {
+        val connection = (URL(API_URL).openConnection() as HttpURLConnection).apply {
+            requestMethod = "GET"
+            connectTimeout = TIMEOUT_MS
+            readTimeout = TIMEOUT_MS
+            setRequestProperty("Accept", "application/vnd.github+json")
+            setRequestProperty("User-Agent", USER_AGENT)
+        }
+        try {
+            if (connection.responseCode != HttpURLConnection.HTTP_OK) {
+                // 403 here is almost always the anonymous rate limit, 60 per hour per IP.
+                lastError = "GitHub returned HTTP ${connection.responseCode}"
+                Log.i(TAG, "Release check returned HTTP ${connection.responseCode}")
+                return@runCatching null
+            }
+            connection.inputStream.bufferedReader().use { it.readText() }
+        } finally {
+            connection.disconnect()
+        }
+    }.getOrElse {
+        // Offline, DNS down, or the INTERNET permission missing from the manifest, which is
+        // exactly what this used to swallow.
+        lastError = describe(it)
+        Log.i(TAG, "Release check failed: ${it.message}", it)
+        null
+    }
+
+    /**
+     * The thin answer, from a different hostname.
+     *
+     * `releases/latest` redirects to `releases/tag/v<n>` and the tag is the version code, so a
+     * single HEAD request that is deliberately *not* followed gives the whole comparison away
+     * in the `Location` header. No notes come back and the APK URL is reconstructed from the
+     * asset name the workflow always publishes, which is enough for the banner and enough for
+     * the download button.
+     */
+    private fun readLatestTag(): AppRelease? = runCatching {
+        val connection = (URL(RELEASES_PAGE).openConnection() as HttpURLConnection).apply {
+            requestMethod = "HEAD"
+            instanceFollowRedirects = false
+            connectTimeout = TIMEOUT_MS
+            readTimeout = TIMEOUT_MS
+            setRequestProperty("User-Agent", USER_AGENT)
+        }
+        val location = try {
+            connection.getHeaderField("Location")
+        } finally {
+            connection.disconnect()
+        }
+
+        ReleaseParser.fromRedirect(location, RELEASES_BASE, APK_NAME)
+    }.getOrElse {
+        Log.i(TAG, "Releases page fallback failed: ${it.message}", it)
+        null
+    }
 
     /**
      * Turns the exception into something worth reading on a phone.
@@ -159,6 +205,9 @@ class UpdateChecker(private val context: Context) {
      * make, and saying it to someone whose phone is plainly online is worse than saying
      * nothing. So the no-network case names both possibilities and points at the one the
      * user can check.
+     *
+     * By the time any of this reaches the screen the releases page has been tried too, so
+     * the wording names GitHub as a whole rather than one hostname.
      */
     private fun describe(error: Throwable): String = when (error) {
         is UnknownHostException ->
@@ -166,8 +215,8 @@ class UpdateChecker(private val context: Context) {
                 // A network is up and validated and the name still would not resolve, so
                 // something is intercepting the lookup: Private DNS pointed somewhere
                 // unreachable, a VPN or firewall app, or a blocking resolver upstream.
-                "The phone is online but could not look up api.github.com. Check Private " +
-                    "DNS, a VPN, or an ad blocker."
+                "The phone is online but could not look up github.com. Check Private DNS, " +
+                    "a VPN, or an ad blocker."
             } else {
                 // Either there is genuinely no network, or this app has been denied it.
                 // Android reports those identically, so both get named.
@@ -202,9 +251,17 @@ class UpdateChecker(private val context: Context) {
         const val KEY_CACHED_AT = "cached_at"
 
         const val CACHE_TTL_MS = 15 * 60 * 1000L
+        const val TIMEOUT_MS = 8_000
 
-        const val RELEASES_URL =
+        const val USER_AGENT = "GuitarTuner-Android"
+
+        /** The name the release workflow always gives the published APK. */
+        const val APK_NAME = "guitartuner.apk"
+
+        const val API_URL =
             "https://api.github.com/repos/Marukiee/GuitarTuner/releases/latest"
+        const val RELEASES_BASE = "https://github.com/Marukiee/GuitarTuner/releases"
+        const val RELEASES_PAGE = "$RELEASES_BASE/latest"
     }
 }
 
@@ -244,4 +301,28 @@ internal fun parse(json: String): AppRelease? = runCatching {
         apkUrl = apkUrl ?: return null,
     )
 }.getOrNull()
+
+    /**
+     * The same answer read out of a redirect instead of out of a payload.
+     *
+     * `github.com/<repo>/releases/latest` replies with a `Location` of `.../releases/tag/v<n>`,
+     * which carries the version code and nothing else: no notes, no asset list. The download
+     * URL is rebuilt from the fixed asset name the release workflow publishes, so this thinner
+     * route still hands the banner a button that works.
+     */
+    internal fun fromRedirect(location: String?, releasesBase: String, apkName: String): AppRelease? {
+        val tag = location
+            ?.substringAfterLast("/tag/", "")
+            ?.substringBefore('?')
+            ?.takeIf { it.isNotBlank() }
+            ?: return null
+        val versionCode = tag.removePrefix("v").toLongOrNull() ?: return null
+
+        return AppRelease(
+            versionCode = versionCode,
+            name = "Build $versionCode",
+            notes = null,
+            apkUrl = "$releasesBase/download/$tag/$apkName",
+        )
+    }
 }
