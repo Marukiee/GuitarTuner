@@ -149,24 +149,31 @@ class UpdateChecker(private val context: Context) {
      *
      * An [UnknownHostException] is by far the most common failure and the raw message is
      * actively misleading: it reads like GitHub is down when in practice the phone's own
-     * resolver never answered. That has one cause when there is no network at all and a
-     * completely different one when there is, so the connectivity state is checked before
-     * choosing the wording. Private DNS pointed at an unreachable server, a VPN, and a
-     * blocking resolver all land in the second case, and none of them are fixable here.
+     * resolver never answered.
+     *
+     * The important thing here is what an app can and cannot tell about why. When the
+     * system denies an app the network, it does not throw a permission error: it hides
+     * every network from that app, so [ConnectivityManager.getActiveNetwork] returns null
+     * and DNS fails, which is bit for bit what a phone in flight mode looks like from in
+     * here. "No internet connection" is therefore a claim this class is not entitled to
+     * make, and saying it to someone whose phone is plainly online is worse than saying
+     * nothing. So the no-network case names both possibilities and points at the one the
+     * user can check.
      */
     private fun describe(error: Throwable): String = when (error) {
         is UnknownHostException ->
             if (isOnline()) {
-                // The phone has a working network and still could not resolve the name, so
-                // the resolver is being denied or redirected. On Android 12 and up the usual
-                // culprit is this app's own "Mobile data and Wi-Fi" toggle being off, which
-                // fails lookups rather than throwing a permission error and so reads exactly
-                // like GitHub being down.
-                "The phone is online but could not look up api.github.com. Check this app's " +
-                    "network access in Android settings, then Private DNS, a VPN or an ad " +
-                    "blocker. Use \"Open releases page\" below to download it in the browser."
+                // A network is up and validated and the name still would not resolve, so
+                // something is intercepting the lookup: Private DNS pointed somewhere
+                // unreachable, a VPN or firewall app, or a blocking resolver upstream.
+                "The phone is online but could not look up api.github.com. Check Private " +
+                    "DNS, a VPN, or an ad blocker."
             } else {
-                "No internet connection."
+                // Either there is genuinely no network, or this app has been denied it.
+                // Android reports those identically, so both get named.
+                "No network reached this app. If the phone is online, allow network access " +
+                    "for Guitar Tuner in Android settings (Apps, Guitar Tuner, Mobile data " +
+                    "and Wi-Fi), and check any firewall or VPN app."
             }
 
         is SocketTimeoutException -> "GitHub did not answer in time. Try again."
@@ -176,6 +183,9 @@ class UpdateChecker(private val context: Context) {
     /**
      * Whether the system believes a network is up and validated. Advisory only: it decides
      * how to word a failure that has already happened, never whether to attempt the call.
+     *
+     * This is answered per app. An app denied the network sees no active network at all,
+     * which is why a false here does not mean the phone is offline.
      */
     private fun isOnline(): Boolean = runCatching {
         val manager = context.getSystemService(ConnectivityManager::class.java) ?: return false
