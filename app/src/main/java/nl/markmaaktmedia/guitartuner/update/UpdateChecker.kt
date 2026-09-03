@@ -2,13 +2,17 @@ package nl.markmaaktmedia.guitartuner.update
 
 import android.content.Context
 import android.content.pm.PackageManager
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.os.Build
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.HttpURLConnection
+import java.net.SocketTimeoutException
 import java.net.URL
+import java.net.UnknownHostException
 
 /** A published build, as advertised by the repository's latest GitHub Release. */
 data class AppRelease(
@@ -122,8 +126,8 @@ class UpdateChecker(private val context: Context) {
         }.getOrElse {
             // Offline, DNS down, or the INTERNET permission missing from the manifest, which is
             // exactly what this used to swallow.
-            lastError = it::class.java.simpleName + ": " + (it.message ?: "no detail")
-            Log.i(TAG, "Release check failed: ${it.message}")
+            lastError = describe(it)
+            Log.i(TAG, "Release check failed: ${it.message}", it)
             null
         } ?: return null
 
@@ -139,6 +143,46 @@ class UpdateChecker(private val context: Context) {
         return release
     }
 
+
+    /**
+     * Turns the exception into something worth reading on a phone.
+     *
+     * An [UnknownHostException] is by far the most common failure and the raw message is
+     * actively misleading: it reads like GitHub is down when in practice the phone's own
+     * resolver never answered. That has one cause when there is no network at all and a
+     * completely different one when there is, so the connectivity state is checked before
+     * choosing the wording. Private DNS pointed at an unreachable server, a VPN, and a
+     * blocking resolver all land in the second case, and none of them are fixable here.
+     */
+    private fun describe(error: Throwable): String = when (error) {
+        is UnknownHostException ->
+            if (isOnline()) {
+                // The phone has a working network and still could not resolve the name, so
+                // the resolver is being denied or redirected. On Android 12 and up the usual
+                // culprit is this app's own "Mobile data and Wi-Fi" toggle being off, which
+                // fails lookups rather than throwing a permission error and so reads exactly
+                // like GitHub being down.
+                "The phone is online but could not look up api.github.com. Check this app's " +
+                    "network access in Android settings, then Private DNS, a VPN or an ad " +
+                    "blocker. Use \"Open releases page\" below to download it in the browser."
+            } else {
+                "No internet connection."
+            }
+
+        is SocketTimeoutException -> "GitHub did not answer in time. Try again."
+        else -> error::class.java.simpleName + ": " + (error.message ?: "no detail")
+    }
+
+    /**
+     * Whether the system believes a network is up and validated. Advisory only: it decides
+     * how to word a failure that has already happened, never whether to attempt the call.
+     */
+    private fun isOnline(): Boolean = runCatching {
+        val manager = context.getSystemService(ConnectivityManager::class.java) ?: return false
+        val capabilities = manager.getNetworkCapabilities(manager.activeNetwork) ?: return false
+        capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+            capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+    }.getOrDefault(false)
 
     private companion object {
         const val TAG = "UpdateChecker"

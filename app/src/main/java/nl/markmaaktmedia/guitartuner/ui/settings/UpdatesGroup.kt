@@ -1,5 +1,7 @@
 package nl.markmaaktmedia.guitartuner.ui.settings
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -29,6 +31,12 @@ import nl.markmaaktmedia.guitartuner.update.UpdateChecker
  * back, including the failure. The preview switch renders the banner with dummy content,
  * mirroring the developer option MarkMySteps has, so the bar itself can be checked
  * without publishing anything.
+ *
+ * It also offers a way out. Every one of those causes leaves the user with an app that
+ * cannot update itself, and on a phone where the resolver is the problem, which is what
+ * a per-app network restriction or a misconfigured Private DNS looks like from in here,
+ * no amount of retrying inside the app will help. The releases page opens in the browser
+ * instead, which is a different app with different permissions and often just works.
  */
 @Composable
 internal fun UpdatesGroup(
@@ -80,6 +88,17 @@ internal fun UpdatesGroup(
                 null
             },
         )
+        action(
+            title = "Open releases page",
+            description = "Downloads the newest APK in the browser. Use this when the check " +
+                "above cannot reach GitHub.",
+            icon = { TunerIcons.OpenInNew },
+            onClick = {
+                runCatching {
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(RELEASES_PAGE)))
+                }
+            },
+        )
         switch(
             title = "Preview the banner",
             description = "Shows the update bar with dummy content, so it can be checked " +
@@ -90,3 +109,7 @@ internal fun UpdatesGroup(
         )
     }
 }
+
+/** The human facing page, not the API endpoint the checker uses. */
+private const val RELEASES_PAGE =
+    "https://github.com/Marukiee/GuitarTuner/releases/latest"
