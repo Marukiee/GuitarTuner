@@ -108,45 +108,45 @@ private fun specFor(layout: HeadstockLayout, stringCount: Int): HeadSpec = when 
         // A slotted head: wide, gently flared, symmetric.
         val perSide = stringCount / 2
         HeadSpec(
-            crownLeft = 0.08f, crownRight = 0.92f,
-            waistLeft = 0.20f, waistRight = 0.80f,
-            neckLeft = 0.30f, neckRight = 0.70f,
-            headBottom = 0.72f, crownY = 0.09f,
-            pegs = sidePegs(perSide, perSide, 0.15f, 0.85f, 0.17f, 0.60f),
-            nutSpread = 0.32f,
+            crownLeft = 0.14f, crownRight = 0.86f,
+            waistLeft = 0.24f, waistRight = 0.76f,
+            neckLeft = 0.33f, neckRight = 0.67f,
+            headBottom = 0.70f, crownY = 0.10f,
+            pegs = sidePegs(perSide, perSide, 0.21f, 0.79f, 0.18f, 0.56f),
+            nutSpread = 0.40f,
         )
     }
 
     HeadstockLayout.FOUR_THREE -> HeadSpec(
-        crownLeft = 0.06f, crownRight = 0.94f,
-        waistLeft = 0.17f, waistRight = 0.83f,
-        neckLeft = 0.29f, neckRight = 0.71f,
-        headBottom = 0.76f, crownY = 0.07f,
-        pegs = sidePegs(stringCount - stringCount / 2, stringCount / 2, 0.13f, 0.87f, 0.14f, 0.66f),
-        nutSpread = 0.36f,
+        crownLeft = 0.12f, crownRight = 0.88f,
+        waistLeft = 0.22f, waistRight = 0.78f,
+        neckLeft = 0.32f, neckRight = 0.68f,
+        headBottom = 0.74f, crownY = 0.08f,
+        pegs = sidePegs(stringCount - stringCount / 2, stringCount / 2, 0.19f, 0.81f, 0.15f, 0.60f),
+        nutSpread = 0.42f,
     )
 
     HeadstockLayout.INLINE -> HeadSpec(
         // The Fender paddle. Every tuner on one edge, and the outline asymmetric to match.
-        crownLeft = 0.14f, crownRight = 0.66f,
-        waistLeft = 0.20f, waistRight = 0.74f,
-        neckLeft = 0.30f, neckRight = 0.66f,
+        crownLeft = 0.18f, crownRight = 0.66f,
+        waistLeft = 0.24f, waistRight = 0.72f,
+        neckLeft = 0.32f, neckRight = 0.66f,
         headBottom = 0.80f, crownY = 0.06f,
         pegs = List(stringCount) { index ->
             val t = if (stringCount == 1) 0.5f else index / (stringCount - 1f)
-            Offset(0.27f, 0.12f + t * 0.56f)
+            Offset(0.30f, 0.12f + t * 0.56f)
         },
-        nutSpread = 0.26f,
+        nutSpread = 0.30f,
     )
 
     HeadstockLayout.TWO_PER_SIDE -> HeadSpec(
         // Short and square: nothing like the long flare of a six string head.
-        crownLeft = 0.12f, crownRight = 0.88f,
-        waistLeft = 0.20f, waistRight = 0.80f,
-        neckLeft = 0.31f, neckRight = 0.69f,
-        headBottom = 0.56f, crownY = 0.14f,
-        pegs = sidePegs(stringCount - stringCount / 2, stringCount / 2, 0.17f, 0.83f, 0.16f, 0.42f),
-        nutSpread = 0.28f,
+        crownLeft = 0.16f, crownRight = 0.84f,
+        waistLeft = 0.24f, waistRight = 0.76f,
+        neckLeft = 0.33f, neckRight = 0.67f,
+        headBottom = 0.54f, crownY = 0.15f,
+        pegs = sidePegs(stringCount - stringCount / 2, stringCount / 2, 0.22f, 0.78f, 0.16f, 0.38f),
+        nutSpread = 0.36f,
     )
 
     HeadstockLayout.PAIRED_FOUR -> {
@@ -154,25 +154,25 @@ private fun specFor(layout: HeadstockLayout, stringCount: Int): HeadSpec = when 
         // pairs each, and eight slots at the nut that pair up the same way.
         val perSide = stringCount / 2
         HeadSpec(
-            crownLeft = 0.10f, crownRight = 0.90f,
-            waistLeft = 0.18f, waistRight = 0.82f,
-            neckLeft = 0.30f, neckRight = 0.70f,
-            headBottom = 0.72f, crownY = 0.05f,
-            pegs = pairedColumn(perSide, 0.16f, 0.15f, 0.60f, downwards = true) +
-                pairedColumn(perSide, 0.84f, 0.15f, 0.60f, downwards = false),
-            nutSpread = 0.34f,
+            crownLeft = 0.14f, crownRight = 0.86f,
+            waistLeft = 0.22f, waistRight = 0.78f,
+            neckLeft = 0.32f, neckRight = 0.68f,
+            headBottom = 0.70f, crownY = 0.06f,
+            pegs = pairedColumn(perSide, 0.21f, 0.16f, 0.56f, downwards = true) +
+                pairedColumn(perSide, 0.79f, 0.16f, 0.56f, downwards = false),
+            nutSpread = 0.40f,
             paired = true,
         )
     }
 
     HeadstockLayout.BANJO -> HeadSpec(
-        crownLeft = 0.16f, crownRight = 0.84f,
-        waistLeft = 0.24f, waistRight = 0.76f,
-        neckLeft = 0.32f, neckRight = 0.68f,
-        headBottom = 0.50f, crownY = 0.12f,
-        pegs = sidePegs(2, 2, 0.20f, 0.80f, 0.14f, 0.36f),
-        nutSpread = 0.26f,
-        dronePeg = Offset(0.71f, 0.78f),
+        crownLeft = 0.19f, crownRight = 0.81f,
+        waistLeft = 0.26f, waistRight = 0.74f,
+        neckLeft = 0.34f, neckRight = 0.66f,
+        headBottom = 0.50f, crownY = 0.13f,
+        pegs = sidePegs(2, 2, 0.24f, 0.76f, 0.15f, 0.35f),
+        nutSpread = 0.34f,
+        dronePeg = Offset(0.69f, 0.78f),
     )
 
     HeadstockLayout.SCROLL -> HeadSpec(
@@ -287,6 +287,11 @@ private fun DrawScope.drawHead(
     // Strings run straight up the neck to the nut and only then fan out to the tuners.
     // Fanning the whole way, which is what the first version did, draws a bundle of
     // lines converging under the nut and reads as a cobweb rather than as an instrument.
+    //
+    // The fan itself is kept shallow. On a real head the nut is nearly as wide as the
+    // spacing of the tuners, so the strings barely splay; drawing the nut narrow and the
+    // tuners far apart turns six near parallel lines into a wine glass, which is what
+    // this looked like before the nut was widened and the tuners brought in.
     val nutY = bottom + (1f - bottom) * 0.22f
     val stringWidth = (w * 0.028f).coerceAtLeast(1.0.dp.toPx())
     val pegs = spec.pegs

@@ -32,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import nl.markmaaktmedia.guitartuner.domain.model.Instrument
 import nl.markmaaktmedia.guitartuner.domain.model.Tuning
@@ -172,10 +173,11 @@ private fun InstrumentCard(
             modifier = Modifier.size(width = 48.dp, height = 66.dp),
         )
         Text(
-            text = instrument.displayName,
+            text = instrument.shortName,
             style = MaterialTheme.typography.labelMedium,
             color = content,
-            maxLines = 2,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }

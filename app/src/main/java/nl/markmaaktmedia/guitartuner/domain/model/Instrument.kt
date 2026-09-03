@@ -55,6 +55,12 @@ enum class HeadstockScale { SMALL, MEDIUM, LARGE }
 
 enum class Instrument(
     val displayName: String,
+    /**
+     * The name on a picker card, which is 112dp wide and has room for one line.
+     * "Acoustic guitar" wraps there and a wrapped label under a drawing looks like a
+     * mistake, so the card drops the word every entry in that row shares anyway.
+     */
+    val shortName: String,
     /** One line in the picker saying what actually differs about this instrument. */
     val subtitle: String,
     val layout: HeadstockLayout,
@@ -63,6 +69,7 @@ enum class Instrument(
 ) {
     ACOUSTIC(
         displayName = "Acoustic guitar",
+        shortName = "Acoustic",
         subtitle = "Six strings, slotted 3+3 head",
         layout = HeadstockLayout.THREE_PER_SIDE,
         headstockScale = HeadstockScale.MEDIUM,
@@ -70,6 +77,7 @@ enum class Instrument(
     ),
     ELECTRIC(
         displayName = "Electric guitar",
+        shortName = "Electric",
         subtitle = "Six strings, six in a line",
         layout = HeadstockLayout.INLINE,
         headstockScale = HeadstockScale.MEDIUM,
@@ -77,6 +85,7 @@ enum class Instrument(
     ),
     GUITAR_7(
         displayName = "7-string guitar",
+        shortName = "7-string",
         subtitle = "A low B under standard tuning",
         layout = HeadstockLayout.FOUR_THREE,
         headstockScale = HeadstockScale.MEDIUM,
@@ -84,6 +93,7 @@ enum class Instrument(
     ),
     BASS_4(
         displayName = "Bass",
+        shortName = "Bass",
         subtitle = "Four strings, an octave below the guitar",
         layout = HeadstockLayout.TWO_PER_SIDE,
         headstockScale = HeadstockScale.LARGE,
@@ -91,6 +101,7 @@ enum class Instrument(
     ),
     BASS_5(
         displayName = "5-string bass",
+        shortName = "Bass 5",
         subtitle = "Down to a low B at 31 Hz",
         layout = HeadstockLayout.INLINE,
         headstockScale = HeadstockScale.LARGE,
@@ -98,6 +109,7 @@ enum class Instrument(
     ),
     UKULELE(
         displayName = "Ukulele",
+        shortName = "Ukulele",
         subtitle = "Four strings, re-entrant by default",
         layout = HeadstockLayout.TWO_PER_SIDE,
         headstockScale = HeadstockScale.SMALL,
@@ -105,6 +117,7 @@ enum class Instrument(
     ),
     BANJO(
         displayName = "Banjo",
+        shortName = "Banjo",
         subtitle = "Five strings, the drone tuned off the neck",
         layout = HeadstockLayout.BANJO,
         headstockScale = HeadstockScale.MEDIUM,
@@ -112,6 +125,7 @@ enum class Instrument(
     ),
     MANDOLIN(
         displayName = "Mandolin",
+        shortName = "Mandolin",
         subtitle = "Four courses in fifths, strung in pairs",
         layout = HeadstockLayout.PAIRED_FOUR,
         headstockScale = HeadstockScale.SMALL,
@@ -119,6 +133,7 @@ enum class Instrument(
     ),
     VIOLIN(
         displayName = "Violin",
+        shortName = "Violin",
         subtitle = "Four strings in fifths, pegbox and scroll",
         layout = HeadstockLayout.SCROLL,
         headstockScale = HeadstockScale.MEDIUM,
@@ -126,6 +141,7 @@ enum class Instrument(
     ),
     CELLO(
         displayName = "Cello",
+        shortName = "Cello",
         subtitle = "An octave and a fifth below the violin",
         layout = HeadstockLayout.SCROLL,
         headstockScale = HeadstockScale.LARGE,
