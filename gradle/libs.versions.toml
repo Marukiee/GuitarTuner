@@ -31,7 +31,6 @@ androidx-compose-ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4
 # Material 3 Expressive lives in material3 1.4.0+ (MaterialShapes, MaterialTheme.motionScheme,
 # the expressive type scale). The BOM selects the matching version.
 androidx-compose-material3 = { module = "androidx.compose.material3:material3" }
-androidx-compose-material-icons-extended = { module = "androidx.compose.material:material-icons-extended" }
 
 # RoundedPolygon + Morph: the engine behind M3 Expressive shape morphing, used by the
 # tuning bubble to change silhouette as the pitch approaches the target.

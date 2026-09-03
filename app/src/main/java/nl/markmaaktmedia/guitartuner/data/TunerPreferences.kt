@@ -4,6 +4,7 @@ import android.content.Context
 import nl.markmaaktmedia.guitartuner.audio.MicSource
 import nl.markmaaktmedia.guitartuner.domain.model.Instrument
 import nl.markmaaktmedia.guitartuner.domain.model.Note
+import nl.markmaaktmedia.guitartuner.domain.model.Tuning
 import nl.markmaaktmedia.guitartuner.domain.model.ThemeMode
 
 /**
@@ -21,22 +22,46 @@ class TunerPreferences(context: Context) {
     var instrument: Instrument
         get() = prefs.getString(KEY_INSTRUMENT, null)
             ?.let { name -> Instrument.entries.firstOrNull { it.name == name } }
-            ?: Instrument.ACOUSTIC_6
+            ?: Instrument.ACOUSTIC
         set(value) = prefs.edit().putString(KEY_INSTRUMENT, value.name).apply()
 
     /**
-     * Defaults to [MicSource.VoiceRecognition].
+     * The chosen tuning, stored per instrument.
      *
-     * UNPROCESSED is the theoretically better choice, since it is the only source guaranteed to
-     * bypass the platform's gain and noise processing. In practice it selects a secondary capsule
-     * on most handsets, which is a coin flip on whether you get a usable signal at all. Voice
-     * recognition has AGC off on nearly every OEM and picks a mic that actually works.
+     * One key for all of them would mean picking Drop D on a guitar and then finding a
+     * ukulele silently back on its default, or worse, on an id it does not have.
      */
-    var micSource: MicSource
+    fun tuningFor(instrument: Instrument): Tuning =
+        prefs.getString(KEY_TUNING_PREFIX + instrument.name, null)
+            ?.let { instrument.tuningById(it) }
+            ?: instrument.defaultTuning
+
+    fun setTuning(instrument: Instrument, tuning: Tuning) {
+        prefs.edit().putString(KEY_TUNING_PREFIX + instrument.name, tuning.id).apply()
+    }
+
+    var dynamicColor: Boolean
+        get() = prefs.getBoolean(KEY_DYNAMIC_COLOR, true)
+        set(value) = prefs.edit().putBoolean(KEY_DYNAMIC_COLOR, value).apply()
+
+    var pureBlack: Boolean
+        get() = prefs.getBoolean(KEY_PURE_BLACK, true)
+        set(value) = prefs.edit().putBoolean(KEY_PURE_BLACK, value).apply()
+
+    /**
+     * Null until the user pins one by hand.
+     *
+     * Storing the automatic choice would defeat the fallback: a source that happened to
+     * work once gets written down, and the rotation that would have found a better one on
+     * the next launch never runs.
+     */
+    var micSource: MicSource?
         get() = prefs.getString(KEY_MIC_SOURCE, null)
             ?.let { name -> MicSource.entries.firstOrNull { it.name == name } }
-            ?: MicSource.VoiceRecognition
-        set(value) = prefs.edit().putString(KEY_MIC_SOURCE, value.name).apply()
+        set(value) {
+            if (value == null) prefs.edit().remove(KEY_MIC_SOURCE).apply()
+            else prefs.edit().putString(KEY_MIC_SOURCE, value.name).apply()
+        }
 
     var themeMode: ThemeMode
         get() = prefs.getString(KEY_THEME, null)
@@ -56,6 +81,9 @@ class TunerPreferences(context: Context) {
     private companion object {
         const val NAME = "guitartuner.settings"
         const val KEY_INSTRUMENT = "instrument"
+        const val KEY_TUNING_PREFIX = "tuning_"
+        const val KEY_DYNAMIC_COLOR = "dynamic_color"
+        const val KEY_PURE_BLACK = "pure_black"
         const val KEY_MIC_SOURCE = "mic_source"
         const val KEY_THEME = "theme_mode"
         const val KEY_REFERENCE = "reference_hz"

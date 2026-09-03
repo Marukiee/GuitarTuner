@@ -23,10 +23,8 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material3.Icon
+import nl.markmaaktmedia.guitartuner.ui.theme.TunerIcons
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -147,7 +145,7 @@ fun UpdateBanner(
                             }
                             .padding(horizontal = 13.dp, vertical = 7.dp),
                     ) {
-                        Icon(Icons.Rounded.Download, contentDescription = null, Modifier.size(15.dp))
+                        Icon(TunerIcons.Download, contentDescription = null, Modifier.size(15.dp))
                         Text(
                             text = stringResource(R.string.download),
                             fontWeight = FontWeight.SemiBold,
@@ -166,7 +164,7 @@ fun UpdateBanner(
                             },
                     ) {
                         Icon(
-                            Icons.Rounded.Close,
+                            TunerIcons.Close,
                             contentDescription = stringResource(R.string.hide),
                             Modifier.size(16.dp),
                         )

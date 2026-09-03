@@ -17,12 +17,14 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -36,6 +38,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -49,8 +52,12 @@ import nl.markmaaktmedia.guitartuner.domain.model.TunerEvent
 import nl.markmaaktmedia.guitartuner.ui.TunerFeedback
 import nl.markmaaktmedia.guitartuner.ui.TunerScreen
 import nl.markmaaktmedia.guitartuner.ui.TunerViewModel
+import nl.markmaaktmedia.guitartuner.ui.components.bouncyClickable
 import nl.markmaaktmedia.guitartuner.ui.settings.SettingsScreen
+import nl.markmaaktmedia.guitartuner.ui.theme.CardSquircle
 import nl.markmaaktmedia.guitartuner.ui.theme.GuitarTunerTheme
+import nl.markmaaktmedia.guitartuner.ui.theme.PillShape
+import nl.markmaaktmedia.guitartuner.ui.theme.TunerIcons
 import nl.markmaaktmedia.guitartuner.update.UpdateBanner
 
 class MainActivity : ComponentActivity() {
@@ -59,12 +66,16 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContent {
-            // The view model is created *outside* the theme on purpose: the chosen theme mode is
+            // The view model is created *outside* the theme on purpose: the theme mode is
             // part of its state, so the theme cannot be the thing that owns it.
             val viewModel: TunerViewModel = viewModel()
             val state by viewModel.uiState.collectAsStateWithLifecycle()
 
-            GuitarTunerTheme(themeMode = state.themeMode) {
+            GuitarTunerTheme(
+                themeMode = state.themeMode,
+                dynamicColor = state.dynamicColor,
+                pureBlack = state.pureBlack,
+            ) {
                 Surface(
                     color = MaterialTheme.colorScheme.background,
                     modifier = Modifier.fillMaxSize(),
@@ -86,8 +97,8 @@ class MainActivity : ComponentActivity() {
 /**
  * Two destinations and one back gesture, which is not worth a navigation library.
  *
- * The tuner keeps listening while Settings is open, so changing the microphone or the instrument
- * takes effect immediately and the input meter can be watched react without leaving the page.
+ * The tuner keeps listening while Settings is open, so changing the microphone or the
+ * reference pitch takes effect immediately and can be checked by playing a string.
  */
 @Composable
 private fun AppContent(viewModel: TunerViewModel) {
@@ -106,7 +117,7 @@ private fun AppContent(viewModel: TunerViewModel) {
         )
     }
 
-    // Re-read the permission on every resume: the user may have granted it in system settings
+    // Re-read the permission on every resume: it may have been granted in system settings
     // while the app sat in the background.
     LifecycleResumeEffect(Unit) {
         val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
@@ -130,7 +141,7 @@ private fun AppContent(viewModel: TunerViewModel) {
             when (event) {
                 is TunerEvent.StringTuned -> feedback.stringTuned()
                 is TunerEvent.AdvancedTo -> Unit
-                TunerEvent.AllStringsTuned -> Unit
+                TunerEvent.AllStringsTuned -> feedback.allTuned()
             }
         }
     }
@@ -153,19 +164,9 @@ private fun AppContent(viewModel: TunerViewModel) {
     ) { settings ->
         when {
             settings -> SettingsScreen(
-                instrument = state.instrument,
-                micSource = state.micSource,
-                micOptions = viewModel.micSourceOptions(),
-                themeMode = state.themeMode,
-                referenceHz = state.referenceHz,
-                onInstrument = viewModel::selectInstrument,
-                onMicSource = viewModel::setMicSource,
-                onThemeMode = viewModel::setThemeMode,
-                onReferenceHz = viewModel::setReferencePitch,
-                bannerPreview = state.bannerPreview,
-                onBannerPreview = viewModel::setBannerPreview,
-                onBack = { showSettings = false },
+                viewModel = viewModel,
                 versionName = BuildConfig.VERSION_NAME,
+                onBack = { showSettings = false },
             )
 
             state.micPermission != MicPermissionState.Granted -> PermissionGate(
@@ -179,18 +180,44 @@ private fun AppContent(viewModel: TunerViewModel) {
 
 @Composable
 private fun PermissionGate(onRequest: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
     Column(
         modifier = Modifier.fillMaxSize().padding(32.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        Box(
+            modifier = Modifier
+                .size(88.dp)
+                .clip(CardSquircle)
+                .background(scheme.surfaceContainerHigh),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                painter = TunerIcons.Mic,
+                contentDescription = null,
+                tint = scheme.primary,
+                modifier = Modifier.size(38.dp),
+            )
+        }
         Text(
             text = stringResource(R.string.mic_permission_rationale),
             style = MaterialTheme.typography.bodyLarge,
+            color = scheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
-        Button(onClick = onRequest) {
-            Text(stringResource(R.string.grant_permission))
+        Box(
+            modifier = Modifier
+                .clip(PillShape)
+                .background(scheme.primary)
+                .bouncyClickable(onClick = onRequest)
+                .padding(horizontal = 26.dp, vertical = 14.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.grant_permission),
+                style = MaterialTheme.typography.labelLarge,
+                color = scheme.onPrimary,
+            )
         }
     }
 }

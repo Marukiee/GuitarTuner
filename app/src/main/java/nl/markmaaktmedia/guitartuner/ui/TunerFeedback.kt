@@ -25,8 +25,9 @@ import nl.markmaaktmedia.guitartuner.R
  * easily arrive before decoding finishes, in which case `play` is a silent no-op. The load result
  * is now tracked so a chime that is not ready yet is skipped knowingly rather than swallowed.
  *
- * The chime itself is a G6 into a C7. Both sit far above the detector's ~420 Hz ceiling, so the
- * sound leaving the speaker can never be picked up by the microphone and mistaken for a string.
+ * The chime itself is a G6 into a C7. Both sit above the detector's ceiling even on the highest
+ * instrument on the list, a violin at about 825 Hz, so the sound leaving the speaker can never be
+ * picked up by the microphone and mistaken for a string.
  */
 class TunerFeedback(context: Context) {
 
@@ -69,6 +70,38 @@ class TunerFeedback(context: Context) {
             Log.i(TAG, "Chime not decoded yet, skipping")
         }
         playSuccessHaptic()
+    }
+
+    /**
+     * The end of a pass over every string.
+     *
+     * Deliberately not the same as one string: the chime plays twice, a fifth apart, and
+     * the haptic is a third primitive longer. A finish that sounds identical to a step
+     * makes the player look at the screen to find out whether they are done, which is the
+     * one moment they should not have to.
+     */
+    fun allTuned() {
+        if (chimeReady) {
+            soundPool.play(chimeId, 1f, 1f, 1, 0, 1f)
+            soundPool.play(chimeId, 0.9f, 0.9f, 1, 0, 1.5f)
+        }
+        val vibrator = vibrator ?: return
+        if (!vibrator.hasVibrator()) return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+            vibrator.areAllPrimitivesSupported(
+                VibrationEffect.Composition.PRIMITIVE_CLICK,
+                VibrationEffect.Composition.PRIMITIVE_TICK,
+            )
+        ) {
+            val effect = VibrationEffect.startComposition()
+                .addPrimitive(VibrationEffect.Composition.PRIMITIVE_TICK, 0.6f)
+                .addPrimitive(VibrationEffect.Composition.PRIMITIVE_CLICK, 0.8f, 60)
+                .addPrimitive(VibrationEffect.Composition.PRIMITIVE_CLICK, 1f, 90)
+                .compose()
+            vibrate(effect)
+        } else {
+            vibrate(VibrationEffect.createOneShot(60, VibrationEffect.DEFAULT_AMPLITUDE))
+        }
     }
 
     private fun playSuccessHaptic() {

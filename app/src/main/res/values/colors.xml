@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Same dark square MarkMySteps wears, so the two read as one family on the home screen. -->
-    <color name="ic_launcher_background">#171C24</color>
+    <!-- The deep slate MarkMySteps and Local AI both wear, so the three read as one
+         family on a home screen. -->
+    <color name="ic_launcher_background">#20303B</color>
+    <!-- Indigo 80 from the app palette. Overridden on Android 12+ by the wallpaper
+         accent, so the icon tracks the same colour the app's theme does. -->
+    <color name="ic_launcher_mark">#BEBDF8</color>
 </resources>

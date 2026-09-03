@@ -1,295 +1,202 @@
 package nl.markmaaktmedia.guitartuner.ui.settings
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Slider
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import nl.markmaaktmedia.guitartuner.audio.MicSource
-import nl.markmaaktmedia.guitartuner.domain.model.Instrument
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import nl.markmaaktmedia.guitartuner.domain.model.Note
 import nl.markmaaktmedia.guitartuner.domain.model.ThemeMode
+import nl.markmaaktmedia.guitartuner.ui.TunerViewModel
+import nl.markmaaktmedia.guitartuner.ui.components.TunerIconButton
+import nl.markmaaktmedia.guitartuner.ui.theme.TunerIcons
 import kotlin.math.roundToInt
 
+private const val SOURCE_URL = "https://github.com/Marukiee/GuitarTuner"
+
 /**
- * Settings in the current Android idiom.
+ * Settings, as four slabs.
  *
- * The previous version was a stack of Material cards with radio buttons in them, which is the
- * 2021 look. What replaced it is how Android itself now renders settings: each row is its own
- * rounded surface, rows are grouped with a small gap between them, and the outer corners of a
- * group are much larger than the inner ones so the group still reads as one block. Selection is
- * shown by filling the row and moving the check to the trailing edge rather than by a radio
- * button on the left.
- *
- * The microphone group is the one that has to be here rather than inferred. Which capture path
- * works is a property of the individual handset, and this app was inert on a phone with a damaged
- * rear microphone precisely because that choice was hardcoded.
+ * The tuner keeps listening while this is open, so changing the reference pitch or the
+ * microphone takes effect straight away and can be checked by playing a string without
+ * leaving the page.
  */
 @Composable
 fun SettingsScreen(
-    instrument: Instrument,
-    micSource: MicSource,
-    micOptions: List<MicSource>,
-    themeMode: ThemeMode,
-    referenceHz: Float,
-    onInstrument: (Instrument) -> Unit,
-    onMicSource: (MicSource) -> Unit,
-    onThemeMode: (ThemeMode) -> Unit,
-    onReferenceHz: (Float) -> Unit,
-    bannerPreview: Boolean,
-    onBannerPreview: (Boolean) -> Unit,
-    onBack: () -> Unit,
+    viewModel: TunerViewModel,
     versionName: String,
-    modifier: Modifier = Modifier,
+    onBack: () -> Unit,
 ) {
-    val appBarState = rememberTopAppBarState()
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(appBarState)
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
 
-    Scaffold(
-        modifier = modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            // A large collapsing title is the current pattern for a settings destination, and it
-            // gives the expressive type scale somewhere to actually show up.
-            LargeTopAppBar(
-                title = { Text("Settings") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                scrollBehavior = scrollBehavior,
-            )
-        },
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(28.dp),
-        ) {
-            SettingsGroup(
-                title = "Instrument",
-                caption = "Sets the tuning, the number of pegs and the headstock shape.",
-            ) {
-                Instrument.entries.forEachIndexed { index, option ->
-                    ChoiceRow(
-                        label = option.displayName,
-                        detail = option.strings.joinToString("  ") { it.fullLabel },
-                        selected = option == instrument,
-                        shape = groupShape(index, Instrument.entries.size),
-                        onSelect = { onInstrument(option) },
-                    )
-                }
-            }
-
-            SettingsGroup(
-                title = "Microphone",
-                caption = "Decides which physical microphone the phone opens. If one of yours is " +
-                    "damaged, pick another here and watch the level bar on the tuner.",
-            ) {
-                micOptions.forEachIndexed { index, option ->
-                    ChoiceRow(
-                        label = option.label,
-                        detail = option.description,
-                        selected = option == micSource,
-                        shape = groupShape(index, micOptions.size),
-                        onSelect = { onMicSource(option) },
-                    )
-                }
-            }
-
-            SettingsGroup(title = "Appearance", caption = null) {
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceContainer,
-                    shape = RoundedCornerShape(GROUP_OUTER),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(12.dp)) {
-                        ThemeMode.entries.forEachIndexed { index, mode ->
-                            SegmentedButton(
-                                selected = mode == themeMode,
-                                onClick = { onThemeMode(mode) },
-                                shape = SegmentedButtonDefaults.itemShape(
-                                    index,
-                                    ThemeMode.entries.size,
-                                ),
-                            ) {
-                                Text(mode.label)
-                            }
-                        }
-                    }
-                }
-            }
-
-            SettingsGroup(
-                title = "Reference pitch",
-                caption = "Every target frequency is derived from this, so a whole ensemble can " +
-                    "be moved off concert pitch at once.",
-            ) {
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceContainer,
-                    shape = RoundedCornerShape(GROUP_OUTER),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Column(Modifier.padding(horizontal = 20.dp, vertical = 14.dp)) {
-                        Text(
-                            text = "A = ${referenceHz.roundToInt()} Hz",
-                            style = MaterialTheme.typography.headlineSmall,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        Slider(
-                            value = referenceHz,
-                            onValueChange = { onReferenceHz(it.roundToInt().toFloat()) },
-                            valueRange = 415f..466f,
-                            steps = 50,
-                        )
-                    }
-                }
-            }
-
-            UpdatesGroup(
-                versionName = versionName,
-                bannerPreview = bannerPreview,
-                onBannerPreview = onBannerPreview,
-            )
-        }
-    }
-}
-
-private val GROUP_OUTER = 24.dp
-private val GROUP_INNER = 6.dp
-
-/**
- * Large radii on the outside of a group, small ones between its rows. That contrast is what makes
- * a stack of separate surfaces read as one grouped list instead of a pile of cards.
- */
-private fun groupShape(index: Int, count: Int): Shape {
-    val top = if (index == 0) GROUP_OUTER else GROUP_INNER
-    val bottom = if (index == count - 1) GROUP_OUTER else GROUP_INNER
-    return RoundedCornerShape(topStart = top, topEnd = top, bottomStart = bottom, bottomEnd = bottom)
-}
-
-@Composable
-private fun SettingsGroup(
-    title: String,
-    caption: String?,
-    content: @Composable () -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(start = 20.dp, bottom = 6.dp),
-        )
-        content()
-        if (caption != null) {
-            Text(
-                text = caption,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 20.dp, end = 12.dp, top = 8.dp),
-            )
-        }
-    }
-}
-
-@Composable
-private fun ChoiceRow(
-    label: String,
-    detail: String?,
-    selected: Boolean,
-    shape: Shape,
-    onSelect: () -> Unit,
-) {
-    val container by animateColorAsState(
-        targetValue = if (selected) {
-            MaterialTheme.colorScheme.secondaryContainer
-        } else {
-            MaterialTheme.colorScheme.surfaceContainer
-        },
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-        label = "rowContainer",
-    )
-
-    Surface(
-        onClick = onSelect,
-        shape = shape,
-        color = container,
-        modifier = Modifier.fillMaxWidth(),
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .verticalScroll(rememberScrollState())
+            .navigationBarsPadding(),
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .selectableGroup()
-                .padding(horizontal = 20.dp, vertical = 14.dp),
+            modifier = Modifier.fillMaxWidth().padding(start = 8.dp, end = 20.dp, top = 8.dp, bottom = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Column(Modifier.weight(1f)) {
-                Text(label, style = MaterialTheme.typography.bodyLarge)
-                if (detail != null) {
-                    Text(
-                        text = detail,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            if (selected) {
-                Icon(
-                    Icons.Rounded.Check,
-                    contentDescription = "Selected",
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                    modifier = Modifier.size(22.dp),
+            TunerIconButton(
+                icon = TunerIcons.Back,
+                contentDescription = "Back",
+                onClick = onBack,
+            )
+            Text(
+                text = "Settings",
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+
+        SettingsGroup("Pitch") {
+            stepper(
+                title = "Reference pitch",
+                description = "Concert A. Baroque and some orchestras do not use 440.",
+                icon = { TunerIcons.Calibration },
+                value = "${state.referenceHz.roundToInt()} Hz",
+                onDecrease = { viewModel.setReferencePitch(state.referenceHz - 1f) },
+                onIncrease = { viewModel.setReferencePitch(state.referenceHz + 1f) },
+            )
+            if (state.referenceHz != Note.STANDARD_REFERENCE_HZ) {
+                action(
+                    title = "Back to 440 Hz",
+                    icon = { TunerIcons.Restart },
+                    onClick = { viewModel.setReferencePitch(Note.STANDARD_REFERENCE_HZ) },
                 )
             }
         }
+
+        SettingsGroup("Microphone") {
+            viewModel.micSourceOptions().forEach { source ->
+                action(
+                    title = source.label,
+                    description = micDescription(source.label),
+                    onClick = { viewModel.setMicSource(source) },
+                    trailing = if (source == state.micSource) {
+                        {
+                            Icon(
+                                painter = TunerIcons.Check,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                    } else {
+                        { androidx.compose.foundation.layout.Spacer(Modifier.size(20.dp)) }
+                    },
+                )
+            }
+        }
+
+        SettingsGroup("Appearance") {
+            choice(
+                title = "Theme",
+                icon = { TunerIcons.DarkMode },
+                options = listOf(ThemeMode.System, ThemeMode.Light, ThemeMode.Dark),
+                selected = state.themeMode,
+                label = { mode ->
+                    when (mode) {
+                        ThemeMode.System -> "System"
+                        ThemeMode.Light -> "Light"
+                        ThemeMode.Dark -> "Dark"
+                    }
+                },
+                onSelect = viewModel::setThemeMode,
+            )
+            switch(
+                title = "Wallpaper colours",
+                description = "Takes the accent from the system palette, Android 12 and up.",
+                icon = { TunerIcons.Palette },
+                checked = state.dynamicColor,
+                onCheckedChange = viewModel::setDynamicColor,
+            )
+            switch(
+                title = "Pure black",
+                description = "True black behind the dial. On an OLED panel that is no light at all.",
+                icon = { TunerIcons.Contrast },
+                checked = state.pureBlack,
+                onCheckedChange = viewModel::setPureBlack,
+            )
+        }
+
+        UpdatesGroup(
+            versionName = versionName,
+            bannerPreview = state.bannerPreview,
+            onBannerPreview = viewModel::setBannerPreview,
+        )
+
+        SettingsGroup("About") {
+            action(
+                title = "Source code",
+                description = "MIT licensed, on GitHub.",
+                icon = { TunerIcons.Code },
+                onClick = {
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(SOURCE_URL)))
+                },
+                trailing = {
+                    Icon(
+                        painter = TunerIcons.OpenInNew,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp),
+                    )
+                },
+            )
+            info(
+                title = "Audio stays here",
+                description = "Nothing is recorded and nothing is uploaded. The only network " +
+                    "call this app makes asks GitHub whether a newer build exists.",
+                icon = { TunerIcons.Shield },
+            )
+        }
+
+        Text(
+            text = "Guitar Tuner $versionName",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+        )
+        androidx.compose.foundation.layout.Spacer(Modifier.height(32.dp))
     }
 }
 
-/** Plain-language explanation of what each capture path actually does. */
-private val MicSource.description: String
-    get() = when (this) {
-        MicSource.VoiceRecognition ->
-            "Gain control off, and a microphone that works on nearly every phone. The default."
-        MicSource.Main -> "The primary microphone, at the bottom next to the USB-C port."
-        MicSource.Unprocessed ->
-            "Bypasses all processing, best accuracy, but often a secondary microphone."
-        MicSource.Camcorder -> "The rear-facing microphone, next to the camera."
-    }
+/**
+ * Which physical capsule each source tends to select.
+ *
+ * Worth saying out loud: the setting looks like a quality knob and is really a "which
+ * microphone" knob, and on a phone with one dead capsule that is the difference between a
+ * tuner that works and one that does not.
+ */
+private fun micDescription(label: String): String = when (label) {
+    "Unprocessed" -> "No gain control, no noise suppression. Best signal where it works."
+    "Voice rec." -> "Usually a secondary capsule, with processing off on most phones."
+    "Main mic" -> "The one at the bottom of the phone."
+    else -> "The capsule beside the rear camera."
+}

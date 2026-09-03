@@ -3,10 +3,11 @@ package nl.markmaaktmedia.guitartuner.domain.model
 /**
  * One course of the instrument.
  *
- * [physicalIndex] is the position on the headstock counted from the *lowest sounding* string
- * outward (0 = the fat string closest to the player on a guitar). The headstock composable maps
- * this onto peg positions; the tuning sequence uses ascending pitch instead, which is not the
- * same order for re-entrant tunings such as a ukulele's high G.
+ * [physicalIndex] is the position on the headstock counted from the string listed first,
+ * which by convention is the one closest to the player: the fat low E on a guitar, the
+ * drone on a banjo. The headstock composable maps this onto peg positions. The tuning
+ * sequence uses ascending pitch instead, which is not the same order for re-entrant
+ * tunings such as a ukulele's high G or a banjo's fifth string.
  */
 data class TuningString(
     val physicalIndex: Int,
@@ -18,78 +19,120 @@ data class TuningString(
     fun targetHz(referenceHz: Float): Float = note.frequency(referenceHz)
 }
 
-/** How the pegs are arranged, so the headstock vector can lay itself out. */
+/**
+ * How the pegs are arranged.
+ *
+ * This is what stops the instrument picker from being a list of identical drawings with
+ * different words under them. Every family gets its own silhouette, because "acoustic"
+ * and "electric" share a tuning and nothing else: one is a slotted 3-a-side head, the
+ * other is six in a line.
+ */
 enum class HeadstockLayout {
-    /** 3 pegs left, 3 right, Gibson/acoustic style. */
+    /** 3 pegs left, 3 right. Acoustic and Gibson style. */
     THREE_PER_SIDE,
 
-    /** All pegs down one side, Fender style. */
+    /** All pegs down one side, Fender style. Six string electric and five string bass. */
     INLINE,
 
-    /** 4 left, 3 right, for the 7-string. */
+    /** 4 left, 3 right, for the seven string. */
     FOUR_THREE,
 
-    /** 2 per side, ukulele and other short headstocks. */
+    /** 2 per side on a short head. Four string bass and ukulele. */
     TWO_PER_SIDE,
+
+    /** 4 on the head plus one peg partway down the neck: the banjo's fifth string. */
+    BANJO,
+
+    /** 4 per side, the courses paired. Mandolin. */
+    PAIRED_FOUR,
+
+    /** A carved scroll and a pegbox with the pegs through the cheeks. Bowed instruments. */
+    SCROLL,
 }
+
+/** Rough physical size of the head, so a ukulele is not drawn at cello scale. */
+enum class HeadstockScale { SMALL, MEDIUM, LARGE }
 
 enum class Instrument(
     val displayName: String,
+    /** One line in the picker saying what actually differs about this instrument. */
+    val subtitle: String,
     val layout: HeadstockLayout,
-    val strings: List<TuningString>,
+    val headstockScale: HeadstockScale,
+    val tunings: List<Tuning>,
 ) {
-    ACOUSTIC_6(
-        displayName = "Acoustic",
+    ACOUSTIC(
+        displayName = "Acoustic guitar",
+        subtitle = "Six strings, slotted 3+3 head",
         layout = HeadstockLayout.THREE_PER_SIDE,
-        strings = notes(40, 45, 50, 55, 59, 64), // E2 A2 D3 G3 B3 E4
+        headstockScale = HeadstockScale.MEDIUM,
+        tunings = Tunings.acousticGuitar,
     ),
-    ELECTRIC_6(
-        displayName = "Electric",
+    ELECTRIC(
+        displayName = "Electric guitar",
+        subtitle = "Six strings, six in a line",
         layout = HeadstockLayout.INLINE,
-        strings = notes(40, 45, 50, 55, 59, 64),
+        headstockScale = HeadstockScale.MEDIUM,
+        tunings = Tunings.electricGuitar,
     ),
-    ELECTRIC_7(
-        displayName = "7-String",
+    GUITAR_7(
+        displayName = "7-string guitar",
+        subtitle = "A low B under standard tuning",
         layout = HeadstockLayout.FOUR_THREE,
-        strings = notes(35, 40, 45, 50, 55, 59, 64), // B1 + standard
+        headstockScale = HeadstockScale.MEDIUM,
+        tunings = Tunings.sevenString,
     ),
     BASS_4(
         displayName = "Bass",
+        subtitle = "Four strings, an octave below the guitar",
         layout = HeadstockLayout.TWO_PER_SIDE,
-        strings = notes(28, 33, 38, 43), // E1 A1 D2 G2
+        headstockScale = HeadstockScale.LARGE,
+        tunings = Tunings.bassFour,
     ),
     BASS_5(
-        displayName = "Bass 5",
+        displayName = "5-string bass",
+        subtitle = "Down to a low B at 31 Hz",
         layout = HeadstockLayout.INLINE,
-        strings = notes(23, 28, 33, 38, 43), // B0 + E1 A1 D2 G2
+        headstockScale = HeadstockScale.LARGE,
+        tunings = Tunings.bassFive,
     ),
     UKULELE(
         displayName = "Ukulele",
+        subtitle = "Four strings, re-entrant by default",
         layout = HeadstockLayout.TWO_PER_SIDE,
-        // Re-entrant standard C tuning: physical order 4->1 is G4 C4 E4 A4.
-        strings = notes(67, 60, 64, 69),
+        headstockScale = HeadstockScale.SMALL,
+        tunings = Tunings.ukulele,
+    ),
+    BANJO(
+        displayName = "Banjo",
+        subtitle = "Five strings, the drone tuned off the neck",
+        layout = HeadstockLayout.BANJO,
+        headstockScale = HeadstockScale.MEDIUM,
+        tunings = Tunings.banjo,
+    ),
+    MANDOLIN(
+        displayName = "Mandolin",
+        subtitle = "Four courses in fifths, strung in pairs",
+        layout = HeadstockLayout.PAIRED_FOUR,
+        headstockScale = HeadstockScale.SMALL,
+        tunings = Tunings.mandolin,
+    ),
+    VIOLIN(
+        displayName = "Violin",
+        subtitle = "Four strings in fifths, pegbox and scroll",
+        layout = HeadstockLayout.SCROLL,
+        headstockScale = HeadstockScale.SMALL,
+        tunings = Tunings.violin,
+    ),
+    CELLO(
+        displayName = "Cello",
+        subtitle = "An octave and a fifth below the violin",
+        layout = HeadstockLayout.SCROLL,
+        headstockScale = HeadstockScale.LARGE,
+        tunings = Tunings.cello,
     );
 
-    val stringCount: Int get() = strings.size
+    val defaultTuning: Tuning get() = tunings.first()
 
-    /**
-     * Strings ordered low -> high pitch. This is the order auto-advance walks, and for a ukulele
-     * it deliberately differs from [strings]: C4, E4, G4, A4.
-     */
-    val ascendingByPitch: List<TuningString> = strings.sortedBy { it.note.midi }
-
-    /** Lowest fundamental we must be able to resolve, minus a whole tone of drop-tune headroom. */
-    val minDetectableHz: Float
-        get() = ascendingByPitch.first().note.frequency() * 0.85f
-
-    /** Highest fundamental, plus headroom. */
-    val maxDetectableHz: Float
-        get() = ascendingByPitch.last().note.frequency() * 1.25f
+    fun tuningById(id: String): Tuning? = tunings.firstOrNull { it.id == id }
 }
-
-/**
- * Enum constant arguments are evaluated before the companion object exists, so this helper has to
- * live at file scope rather than inside [Instrument].
- */
-private fun notes(vararg midi: Int): List<TuningString> =
-    midi.mapIndexed { index, value -> TuningString(index, Note(value)) }

@@ -32,7 +32,11 @@ class InTuneTracker(
      *         duration is first satisfied.
      */
     fun update(reading: TuningReading?, nowMillis: Long): Boolean {
+        // `settled` is part of the test on purpose. A freshly plucked string sweeps
+        // through the in-tune window on its way somewhere else, and without this the
+        // chime fires on the attack transient of a string that is a quarter tone flat.
         val qualifies = reading != null &&
+            reading.settled &&
             reading.status == TuningStatus.IN_TUNE &&
             reading.clarity >= minClarity
 

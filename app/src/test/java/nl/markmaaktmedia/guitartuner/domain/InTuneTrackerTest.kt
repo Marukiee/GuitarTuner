@@ -8,14 +8,15 @@ import org.junit.Test
 
 class InTuneTrackerTest {
 
-    private val string = Instrument.ACOUSTIC_6.strings.first()
+    private val string = Instrument.ACOUSTIC.defaultTuning.strings.first()
 
-    private fun reading(cents: Float, clarity: Float = 0.97f) = TuningReading(
+    private fun reading(cents: Float, clarity: Float = 0.97f, settled: Boolean = true) = TuningReading(
         target = string,
         frequencyHz = 82.41f,
         cents = cents,
         clarity = clarity,
         levelDb = -20f,
+        settled = settled,
     )
 
     @Test
@@ -55,6 +56,15 @@ class InTuneTrackerTest {
         val tracker = InTuneTracker(holdMillis = 500L)
         assertFalse(tracker.update(reading(4.4f), 0L))
         assertTrue(tracker.update(reading(-4.4f), 520L))
+    }
+
+    @Test
+    fun `an unsettled reading does not count`() {
+        // A freshly plucked string sweeps through the in-tune window on its way somewhere
+        // else. Without the settle test the chime fires on that transient.
+        val tracker = InTuneTracker(holdMillis = 500L)
+        tracker.update(reading(0f, settled = false), 0L)
+        assertFalse(tracker.update(reading(0f, settled = false), 900L))
     }
 
     @Test

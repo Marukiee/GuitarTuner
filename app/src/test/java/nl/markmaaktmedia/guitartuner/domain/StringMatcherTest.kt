@@ -8,7 +8,7 @@ import kotlin.math.abs
 class StringMatcherTest {
 
     private val matcher = StringMatcher()
-    private val guitar = Instrument.ACOUSTIC_6
+    private val guitar = Instrument.ACOUSTIC.defaultTuning
     private val reference = 440f
 
     @Test

@@ -1,7 +1,7 @@
 package nl.markmaaktmedia.guitartuner.domain
 
-import nl.markmaaktmedia.guitartuner.domain.model.Instrument
 import nl.markmaaktmedia.guitartuner.domain.model.Note
+import nl.markmaaktmedia.guitartuner.domain.model.Tuning
 import nl.markmaaktmedia.guitartuner.domain.model.TuningString
 import kotlin.math.abs
 
@@ -28,7 +28,7 @@ class StringMatcher(
      */
     fun match(
         frequencyHz: Float,
-        instrument: Instrument,
+        tuning: Tuning,
         referenceHz: Float,
         currentIndex: Int?,
     ): Int? {
@@ -37,7 +37,7 @@ class StringMatcher(
         var bestIndex: Int? = null
         var bestDistance = Float.MAX_VALUE
 
-        for (string in instrument.strings) {
+        for (string in tuning.strings) {
             val distance = abs(directCents(frequencyHz, string, referenceHz))
             if (distance < bestDistance) {
                 bestDistance = distance
@@ -47,8 +47,8 @@ class StringMatcher(
 
         if (bestIndex == null || bestDistance > maxDistanceCents) return currentIndex
 
-        if (currentIndex != null && currentIndex != bestIndex) {
-            val currentString = instrument.strings[currentIndex]
+        if (currentIndex != null && currentIndex in tuning.strings.indices && currentIndex != bestIndex) {
+            val currentString = tuning.strings[currentIndex]
             val currentDistance = abs(directCents(frequencyHz, currentString, referenceHz))
             // Only switch if the new candidate is clearly better than the incumbent.
             if (currentDistance - bestDistance < switchHysteresisCents) return currentIndex

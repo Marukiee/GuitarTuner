@@ -13,13 +13,15 @@ import kotlin.math.sqrt
  * cumulative mean normalisation likes to lock onto the octave above. The NSDF normalises per lag
  * instead of cumulatively, so the true fundamental keeps the taller peak.
  *
- * Cost: the NSDF is evaluated only for lags inside the configured frequency range, so a 6 string
- * guitar needs roughly 5M multiply-adds per window instead of the 67M a full-range O(n^2)
- * autocorrelation would need. No FFT required.
+ * Cost: the NSDF is evaluated only for lags inside the configured frequency range, and the input
+ * it is handed has already been band limited and decimated to 11.025 kHz by
+ * [DecimatingPreFilter]. Between the two, a six string guitar needs under 1M multiply-adds per
+ * window rather than the 67M a full rate, full range O(n^2) autocorrelation would need. No FFT
+ * required.
  *
- * If you ever need this cheaper (very old devices, or a 5 string bass where the lag range is
- * four times wider), decimate the input by 4 with an anti-alias low pass first: guitar
- * fundamentals top out around 400 Hz, so 11025 Hz is plenty and the cost drops 16x.
+ * The decimation is not only a saving. Removing everything above a few harmonics is what stops
+ * the high partials of a plucked string from putting fine ripples on the NSDF, and those ripples
+ * are the main source of the half-period peaks that read as an octave error.
  */
 class McLeodPitchDetector(
     private val sampleRate: Int,
@@ -84,6 +86,8 @@ class McLeodPitchDetector(
             frequencyHz = frequencyHz,
             clarity = clarity.coerceIn(0f, 1f),
             levelDb = levelDb,
+            // Whether a run of these agrees is the engine's question, not the detector's.
+            settled = false,
         )
     }
 
@@ -188,8 +192,8 @@ class McLeodPitchDetector(
     private companion object {
         const val SILENCE_DB = -120f
 
-        /** Wide enough for a 5 string bass B0 up to a guitar high E, before per instrument tuning. */
+        /** Wide enough for a five string bass B0 up to a violin E5, before per instrument tuning. */
         const val DEFAULT_MIN_HZ = 26f
-        const val DEFAULT_MAX_HZ = 420f
+        const val DEFAULT_MAX_HZ = 900f
     }
 }

@@ -1,41 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  An eighth note, matched to the MarkMySteps compass mark.
+  A tuning fork, drawn to sit in the same family as the MarkMySteps compass and the
+  Local AI capsule: one geometric mark, centred, on the shared slate square.
 
-  The previous version matched that icon's stroke ratio exactly (7.4 units of stroke on a 38 unit
-  mark, both measured off its 432px foreground) and still read as heavier. Matching stroke width
-  does not match perceived weight when the two marks distribute their ink differently: the compass
-  is a large thin ring, so its ink is spread around a wide outline, while a solid note head packs
-  the same ink into one dense blob.
+  Everything is expressed as a stroke rather than a filled body. The compass is a thin
+  ring and the capsule is a short bar, so both spread their ink along an outline; a
+  solid fork would pack the same area into a blob and read heavier next to them even at
+  a matching width. 7.5 units of stroke on this 108 canvas puts the total ink at roughly
+  900 square units against the compass's 960.
 
-  So this version is more linear rather than lighter overall. The stroke comes down to 6.2, the
-  head is a slanted ellipse at real notation proportions instead of a circle, and the stem is
-  longer. Total ink is about 450 square units against the compass's 960, but it reads as the same
-  weight because none of it is concentrated.
-
-  Coordinates are final viewport units so the centring can be read off the file: visible bounds,
-  half strokes and round caps included, run 39.25..68.75 across and 32.65..75.35 down. Both
-  centre on 54, inside the 66 unit safe zone.
+  Coordinates are final viewport units so the centring can be checked by reading them.
+  Half strokes and round caps included, the visible bounds run 39.25..68.75 across and
+  24.25..83.75 down, both centred on 54 and inside the 66 unit safe circle.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Note head: slanted, because a real one is. A circle reads as a lollipop. -->
-    <group
-        android:pivotX="46.65"
-        android:pivotY="69.25"
-        android:rotation="-20">
-        <path
-            android:pathData="M46.65,69.25 m-7.6,0 a7.6,5.8 0 1,0 15.2,0 a7.6,5.8 0 1,0 -15.2,0"
-            android:fillColor="#E8613C" />
-    </group>
-    <!-- Stem and flag in one stroke. -->
+    <!-- Both tines and the U that joins them, in one stroke. -->
     <path
-        android:pathData="M53.65,67.25 L53.65,35.75 C60.65,37.25 65.15,41.25 65.65,47.75"
-        android:strokeColor="#E8613C"
-        android:strokeWidth="6.2"
+        android:pathData="M43,28 L43,54 A11,11 0 0 0 65,54 L65,28"
+        android:strokeColor="@color/ic_launcher_mark"
+        android:strokeWidth="7.5"
         android:strokeLineCap="round"
         android:strokeLineJoin="round" />
+    <!-- The stem. It starts inside the U so the two shapes read as one piece of metal. -->
+    <path
+        android:pathData="M54,63 L54,80"
+        android:strokeColor="@color/ic_launcher_mark"
+        android:strokeWidth="7.5"
+        android:strokeLineCap="round" />
 </vector>
