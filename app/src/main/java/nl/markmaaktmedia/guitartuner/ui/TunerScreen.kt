@@ -45,6 +45,7 @@ import nl.markmaaktmedia.guitartuner.ui.components.TuneDial
 import nl.markmaaktmedia.guitartuner.ui.components.TunerIconButton
 import nl.markmaaktmedia.guitartuner.ui.components.bouncyClickable
 import nl.markmaaktmedia.guitartuner.ui.theme.CardSquircle
+import nl.markmaaktmedia.guitartuner.ui.theme.connectedShape
 import nl.markmaaktmedia.guitartuner.ui.theme.LocalTunerSignals
 import nl.markmaaktmedia.guitartuner.ui.theme.PillShape
 import nl.markmaaktmedia.guitartuner.ui.theme.TunerIcons
@@ -146,10 +147,14 @@ private fun TopRow(
     onOpenSettings: () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
+    // A connected button group, the same idiom as the segmented pickers in Settings: round at
+    // the two ends, cut where the halves meet. The instrument bar and the settings button do
+    // one job between them, "what am I tuning and how", and drawing the second as a separate
+    // circle floating off to the right said they were unrelated.
     Row(
         modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(ConnectedGap),
     ) {
         Row(
             modifier = Modifier
@@ -158,7 +163,7 @@ private fun TopRow(
                 // the same height. A round button that is visibly shorter than the bar it
                 // sits next to reads as a mistake, not as a hierarchy.
                 .height(TopBarHeight)
-                .clip(CardSquircle)
+                .clip(connectedShape(0, 2, outer = TopBarHeight / 2, inner = ConnectedInner))
                 .background(scheme.surfaceContainerHigh)
                 .bouncyClickable(onClickLabel = "Instrument and tuning", onClick = onPickInstrument)
                 .padding(start = 12.dp, end = 14.dp),
@@ -204,12 +209,17 @@ private fun TopRow(
             background = scheme.surfaceContainerHigh,
             size = TopBarHeight,
             iconSize = 22.dp,
+            shape = connectedShape(1, 2, outer = TopBarHeight / 2, inner = ConnectedInner),
         )
     }
 }
 
 /** One height for the instrument bar and the settings button beside it. */
 private val TopBarHeight = 58.dp
+
+/** The slice between the two halves of the top bar, and the corners either side of it. */
+private val ConnectedGap = 6.dp
+private val ConnectedInner = 10.dp
 
 @Composable
 private fun ControlRow(

@@ -102,6 +102,28 @@ fun groupedShape(index: Int, total: Int): RoundedCornerShape {
 /** The gap between grouped items, kept small so the group still reads as one block. */
 val GroupedSpacing = 2.dp
 
+/**
+ * The corner treatment for one button in a connected group, which is [groupedShape] turned on
+ * its side.
+ *
+ * The ends of the group stay round and the corners facing a neighbour pull in, so a row of
+ * controls reads as one pill that has been sliced rather than as separate buttons that happen
+ * to sit near each other. The radii are parameters because the idiom is used at two very
+ * different heights: a 40dp segmented picker and the 58dp bar at the top of the tuner, and a
+ * radius that reads as "round end" on one reads as "slightly soft corner" on the other.
+ */
+fun connectedShape(
+    index: Int,
+    total: Int,
+    outer: Dp = 18.dp,
+    inner: Dp = 6.dp,
+): RoundedCornerShape = when {
+    total <= 1 -> RoundedCornerShape(outer)
+    index == 0 -> RoundedCornerShape(topStart = outer, bottomStart = outer, topEnd = inner, bottomEnd = inner)
+    index == total - 1 -> RoundedCornerShape(topStart = inner, bottomStart = inner, topEnd = outer, bottomEnd = outer)
+    else -> RoundedCornerShape(inner)
+}
+
 val CardSquircle = SquircleShape(28.dp)
 val SheetSquircle = SquircleShape(36.dp)
 val ChipSquircle = SquircleShape(16.dp)

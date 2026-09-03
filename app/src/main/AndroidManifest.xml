@@ -14,8 +14,14 @@
         android:name="android.hardware.microphone"
         android:required="true" />
 
+    <!-- enableOnBackInvokedCallback is what lets the platform send in-flight back progress
+         instead of a single back press. targetSdk 36 turns it on by default, so it is written
+         down for the day the target moves rather than for today: without it
+         PredictiveBackHandler collapses to a plain back press and the Settings page jumps
+         shut instead of following the thumb. -->
     <application
         android:allowBackup="true"
+        android:enableOnBackInvokedCallback="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"

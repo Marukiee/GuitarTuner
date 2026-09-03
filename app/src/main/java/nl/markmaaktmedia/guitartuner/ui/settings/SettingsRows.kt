@@ -27,6 +27,7 @@ import nl.markmaaktmedia.guitartuner.ui.components.bouncyClickable
 import nl.markmaaktmedia.guitartuner.ui.theme.GroupedSpacing
 import nl.markmaaktmedia.guitartuner.ui.theme.TunerIcons
 import nl.markmaaktmedia.guitartuner.ui.theme.TunerMotion
+import nl.markmaaktmedia.guitartuner.ui.theme.connectedShape
 import nl.markmaaktmedia.guitartuner.ui.theme.groupedShape
 
 /**
@@ -155,7 +156,7 @@ class SettingsGroupScope {
                         SegmentButton(
                             text = label(option),
                             selected = option == selected,
-                            shape = segmentShape(index, options.size),
+                            shape = connectedShape(index, options.size),
                             onClick = { onSelect(option) },
                             modifier = Modifier.weight(1f),
                         )
@@ -236,17 +237,6 @@ private fun RowSurface(
         verticalAlignment = Alignment.CenterVertically,
         content = content,
     )
-}
-
-private fun segmentShape(index: Int, total: Int): RoundedCornerShape {
-    val outer = 18.dp
-    val inner = 6.dp
-    return when {
-        total <= 1 -> RoundedCornerShape(outer)
-        index == 0 -> RoundedCornerShape(topStart = outer, bottomStart = outer, topEnd = inner, bottomEnd = inner)
-        index == total - 1 -> RoundedCornerShape(topStart = inner, bottomStart = inner, topEnd = outer, bottomEnd = outer)
-        else -> RoundedCornerShape(inner)
-    }
 }
 
 @Composable

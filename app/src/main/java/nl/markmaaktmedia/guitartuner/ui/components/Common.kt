@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -37,11 +38,12 @@ fun TunerIconButton(
     size: Dp = 44.dp,
     iconSize: Dp = 21.dp,
     enabled: Boolean = true,
+    shape: Shape = PillShape,
 ) {
     Box(
         modifier = modifier
             .size(size)
-            .clip(PillShape)
+            .clip(shape)
             .background(background)
             .bouncyClickable(enabled = enabled, onClickLabel = contentDescription, onClick = onClick),
         contentAlignment = Alignment.Center,
