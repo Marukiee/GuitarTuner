@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import nl.markmaaktmedia.guitartuner.ui.theme.PillShape
 
@@ -33,13 +34,13 @@ fun TunerIconButton(
     modifier: Modifier = Modifier,
     tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     background: Color = Color.Transparent,
-    size: Int = 44,
-    iconSize: Int = 21,
+    size: Dp = 44.dp,
+    iconSize: Dp = 21.dp,
     enabled: Boolean = true,
 ) {
     Box(
         modifier = modifier
-            .size(size.dp)
+            .size(size)
             .clip(PillShape)
             .background(background)
             .bouncyClickable(enabled = enabled, onClickLabel = contentDescription, onClick = onClick),
@@ -49,7 +50,7 @@ fun TunerIconButton(
             painter = icon,
             contentDescription = contentDescription,
             tint = if (enabled) tint else tint.copy(alpha = 0.38f),
-            modifier = Modifier.size(iconSize.dp),
+            modifier = Modifier.size(iconSize),
         )
     }
 }

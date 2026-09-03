@@ -154,10 +154,14 @@ private fun TopRow(
         Row(
             modifier = Modifier
                 .weight(1f)
+                // Fixed rather than content sized, so the settings button beside it can be
+                // the same height. A round button that is visibly shorter than the bar it
+                // sits next to reads as a mistake, not as a hierarchy.
+                .height(TopBarHeight)
                 .clip(CardSquircle)
                 .background(scheme.surfaceContainerHigh)
                 .bouncyClickable(onClickLabel = "Instrument and tuning", onClick = onPickInstrument)
-                .padding(start = 12.dp, end = 14.dp, top = 10.dp, bottom = 10.dp),
+                .padding(start = 12.dp, end = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -165,11 +169,11 @@ private fun TopRow(
                 layout = state.instrument.layout,
                 stringCount = state.tuning.stringCount,
                 scale = state.instrument.headstockScale,
-                bodyColor = scheme.surfaceContainerLowest.copy(alpha = 0.7f),
+                bodyColor = scheme.onSurfaceVariant.copy(alpha = 0.12f),
                 outlineColor = scheme.onSurfaceVariant,
                 pegColor = scheme.primary,
-                stringColor = scheme.onSurfaceVariant.copy(alpha = 0.4f),
-                modifier = Modifier.size(width = 24.dp, height = 34.dp),
+                stringColor = scheme.onSurfaceVariant.copy(alpha = 0.6f),
+                modifier = Modifier.size(width = 27.dp, height = 40.dp),
             )
             Column(Modifier.weight(1f)) {
                 Text(
@@ -198,9 +202,14 @@ private fun TopRow(
             contentDescription = "Settings",
             onClick = onOpenSettings,
             background = scheme.surfaceContainerHigh,
+            size = TopBarHeight,
+            iconSize = 22.dp,
         )
     }
 }
+
+/** One height for the instrument bar and the settings button beside it. */
+private val TopBarHeight = 58.dp
 
 @Composable
 private fun ControlRow(

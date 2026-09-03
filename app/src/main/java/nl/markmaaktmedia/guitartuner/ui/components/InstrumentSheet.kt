@@ -162,11 +162,14 @@ private fun InstrumentCard(
             layout = instrument.layout,
             stringCount = instrument.defaultTuning.stringCount,
             scale = instrument.headstockScale,
-            bodyColor = scheme.surfaceContainerLowest.copy(alpha = 0.6f),
-            outlineColor = content.copy(alpha = 0.55f),
-            pegColor = if (selected) scheme.primary else content.copy(alpha = 0.7f),
-            stringColor = content.copy(alpha = 0.35f),
-            modifier = Modifier.size(width = 46.dp, height = 64.dp),
+            // The fill is a tint of the card's own content colour rather than a light
+            // surface: on a selected card a near white silhouette swallows the outline,
+            // the tuners and the strings, and all that is left is a pale blob.
+            bodyColor = content.copy(alpha = 0.10f),
+            outlineColor = content.copy(alpha = 0.75f),
+            pegColor = if (selected) scheme.primary else content.copy(alpha = 0.85f),
+            stringColor = content.copy(alpha = 0.55f),
+            modifier = Modifier.size(width = 48.dp, height = 66.dp),
         )
         Text(
             text = instrument.displayName,

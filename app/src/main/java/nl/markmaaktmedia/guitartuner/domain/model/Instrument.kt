@@ -121,7 +121,7 @@ enum class Instrument(
         displayName = "Violin",
         subtitle = "Four strings in fifths, pegbox and scroll",
         layout = HeadstockLayout.SCROLL,
-        headstockScale = HeadstockScale.SMALL,
+        headstockScale = HeadstockScale.MEDIUM,
         tunings = Tunings.violin,
     ),
     CELLO(
