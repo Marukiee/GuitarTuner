@@ -6,6 +6,9 @@ import nl.markmaaktmedia.guitartuner.domain.model.Instrument
 import nl.markmaaktmedia.guitartuner.domain.model.Note
 import nl.markmaaktmedia.guitartuner.domain.model.Tuning
 import nl.markmaaktmedia.guitartuner.domain.model.ThemeMode
+import nl.markmaaktmedia.guitartuner.ui.theme.Appearance
+import nl.markmaaktmedia.guitartuner.ui.theme.ColourSeed
+import nl.markmaaktmedia.guitartuner.ui.theme.PaletteStyle
 
 /**
  * The handful of choices that must survive a restart.
@@ -40,13 +43,50 @@ class TunerPreferences(context: Context) {
         prefs.edit().putString(KEY_TUNING_PREFIX + instrument.name, tuning.id).apply()
     }
 
-    var dynamicColor: Boolean
-        get() = prefs.getBoolean(KEY_DYNAMIC_COLOR, true)
-        set(value) = prefs.edit().putBoolean(KEY_DYNAMIC_COLOR, value).apply()
-
     var pureBlack: Boolean
-        get() = prefs.getBoolean(KEY_PURE_BLACK, true)
+        // Off by default: a true black panel is a choice, not a starting point.
+        get() = prefs.getBoolean(KEY_PURE_BLACK, false)
         set(value) = prefs.edit().putBoolean(KEY_PURE_BLACK, value).apply()
+
+    var seed: ColourSeed
+        get() = prefs.getString(KEY_SEED, null)?.let(ColourSeed::fromKey)
+            // The old switch becomes the new first choice: wallpaper on stays wallpaper, off
+            // lands on the indigo the app used to fall back to.
+            ?: if (prefs.getBoolean(KEY_LEGACY_DYNAMIC_COLOR, true)) ColourSeed.WALLPAPER else ColourSeed.INDIGO
+        set(value) = prefs.edit().putString(KEY_SEED, value.storageKey).apply()
+
+    var style: PaletteStyle
+        get() = PaletteStyle.fromKey(prefs.getString(KEY_STYLE, null))
+        set(value) = prefs.edit().putString(KEY_STYLE, value.storageKey).apply()
+
+    var themeMode: ThemeMode
+        get() = prefs.getString(KEY_THEME, null)
+            ?.let { name -> ThemeMode.entries.firstOrNull { it.name == name } }
+            ?: ThemeMode.System
+        set(value) = prefs.edit().putString(KEY_THEME, value.name).apply()
+
+    /** The look as one value, read once before the first frame so the app opens in it. */
+    var appearance: Appearance
+        get() = Appearance(themeMode, seed, style, pureBlack)
+        set(value) {
+            themeMode = value.mode
+            seed = value.seed
+            style = value.style
+            pureBlack = value.pureBlack
+        }
+
+    /** A phone that dims while you tune is a phone you have to touch to keep tuning. */
+    var keepScreenOn: Boolean
+        get() = prefs.getBoolean(KEY_KEEP_SCREEN_ON, true)
+        set(value) = prefs.edit().putBoolean(KEY_KEEP_SCREEN_ON, value).apply()
+
+    var chime: Boolean
+        get() = prefs.getBoolean(KEY_CHIME, true)
+        set(value) = prefs.edit().putBoolean(KEY_CHIME, value).apply()
+
+    var haptics: Boolean
+        get() = prefs.getBoolean(KEY_HAPTICS, true)
+        set(value) = prefs.edit().putBoolean(KEY_HAPTICS, value).apply()
 
     /**
      * Null until the user pins one by hand.
@@ -63,12 +103,6 @@ class TunerPreferences(context: Context) {
             else prefs.edit().putString(KEY_MIC_SOURCE, value.name).apply()
         }
 
-    var themeMode: ThemeMode
-        get() = prefs.getString(KEY_THEME, null)
-            ?.let { name -> ThemeMode.entries.firstOrNull { it.name == name } }
-            ?: ThemeMode.System
-        set(value) = prefs.edit().putString(KEY_THEME, value.name).apply()
-
     /** Developer option: render the update banner with dummy content so it can be checked. */
     var bannerPreview: Boolean
         get() = prefs.getBoolean(KEY_BANNER_PREVIEW, false)
@@ -82,7 +116,12 @@ class TunerPreferences(context: Context) {
         const val NAME = "guitartuner.settings"
         const val KEY_INSTRUMENT = "instrument"
         const val KEY_TUNING_PREFIX = "tuning_"
-        const val KEY_DYNAMIC_COLOR = "dynamic_color"
+        const val KEY_LEGACY_DYNAMIC_COLOR = "dynamic_color"
+        const val KEY_SEED = "colour_seed"
+        const val KEY_STYLE = "palette_style"
+        const val KEY_KEEP_SCREEN_ON = "keep_screen_on"
+        const val KEY_CHIME = "chime"
+        const val KEY_HAPTICS = "haptics"
         const val KEY_PURE_BLACK = "pure_black"
         const val KEY_MIC_SOURCE = "mic_source"
         const val KEY_THEME = "theme_mode"

@@ -2,6 +2,8 @@ package nl.markmaaktmedia.guitartuner.ui
 
 import android.Manifest
 import android.app.Application
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 import android.os.SystemClock
 import androidx.annotation.RequiresPermission
 import androidx.lifecycle.AndroidViewModel
@@ -30,12 +32,12 @@ import nl.markmaaktmedia.guitartuner.domain.StringMatcher
 import nl.markmaaktmedia.guitartuner.domain.model.Instrument
 import nl.markmaaktmedia.guitartuner.domain.model.MicPermissionState
 import nl.markmaaktmedia.guitartuner.domain.model.Note
-import nl.markmaaktmedia.guitartuner.domain.model.ThemeMode
 import nl.markmaaktmedia.guitartuner.domain.model.TunerEvent
 import nl.markmaaktmedia.guitartuner.domain.model.TunerUiState
 import nl.markmaaktmedia.guitartuner.domain.model.Tuning
 import nl.markmaaktmedia.guitartuner.domain.model.TuningReading
 import nl.markmaaktmedia.guitartuner.domain.model.TuningStatus
+import nl.markmaaktmedia.guitartuner.ui.theme.Appearance
 
 /**
  * The state is deliberately split.
@@ -79,9 +81,16 @@ class TunerViewModel(application: Application) : AndroidViewModel(application) {
                 micSource = storedSource ?: sourceCandidates.first(),
                 // A stored source is a deliberate choice, so the fallback stays out of it.
                 micSourcePinned = storedSource != null,
-                themeMode = preferences.themeMode,
-                dynamicColor = preferences.dynamicColor,
-                pureBlack = preferences.pureBlack,
+                // Read now, not on the first resume: starting from "unknown" showed the permission
+                // page for a few frames at every launch, to someone who had already said yes.
+                micPermission = if (
+                    ContextCompat.checkSelfPermission(application, Manifest.permission.RECORD_AUDIO) ==
+                    PackageManager.PERMISSION_GRANTED
+                ) MicPermissionState.Granted else MicPermissionState.Unknown,
+                appearance = preferences.appearance,
+                keepScreenOn = preferences.keepScreenOn,
+                chime = preferences.chime,
+                haptics = preferences.haptics,
                 bannerPreview = preferences.bannerPreview,
             ),
         )
@@ -119,6 +128,7 @@ class TunerViewModel(application: Application) : AndroidViewModel(application) {
 
     private var listenJob: Job? = null
     private var toneJob: Job? = null
+    private var demoJob: Job? = null
 
     /** Frames in a row that carried effectively nothing. Drives the dead microphone fallback. */
     private var silentFrames = 0
@@ -167,6 +177,12 @@ class TunerViewModel(application: Application) : AndroidViewModel(application) {
      * every frequency is measured against this one target, however far away it lands.
      */
     fun selectString(physicalIndex: Int) {
+        // Tapping the string the tuner is already locked to lets go of it, back to auto.
+        val current = _uiState.value
+        if (!current.autoMode && physicalIndex == current.activeStringIndex) {
+            setAutoMode(true)
+            return
+        }
         inTuneTracker.reset()
         _holdProgress.value = 0f
         _uiState.update {
@@ -215,19 +231,24 @@ class TunerViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update { it.copy(bannerPreview = enabled) }
     }
 
-    fun setThemeMode(mode: ThemeMode) {
-        preferences.themeMode = mode
-        _uiState.update { it.copy(themeMode = mode) }
+    fun setAppearance(appearance: Appearance) {
+        preferences.appearance = appearance
+        _uiState.update { it.copy(appearance = appearance) }
     }
 
-    fun setDynamicColor(enabled: Boolean) {
-        preferences.dynamicColor = enabled
-        _uiState.update { it.copy(dynamicColor = enabled) }
+    fun setKeepScreenOn(enabled: Boolean) {
+        preferences.keepScreenOn = enabled
+        _uiState.update { it.copy(keepScreenOn = enabled) }
     }
 
-    fun setPureBlack(enabled: Boolean) {
-        preferences.pureBlack = enabled
-        _uiState.update { it.copy(pureBlack = enabled) }
+    fun setChime(enabled: Boolean) {
+        preferences.chime = enabled
+        _uiState.update { it.copy(chime = enabled) }
+    }
+
+    fun setHaptics(enabled: Boolean) {
+        preferences.haptics = enabled
+        _uiState.update { it.copy(haptics = enabled) }
     }
 
     /** Explicit choice from Settings. Pins the source so the fallback leaves it alone. */
@@ -252,6 +273,7 @@ class TunerViewModel(application: Application) : AndroidViewModel(application) {
             it.copy(
                 tunedStringIndices = emptySet(),
                 activeStringIndex = it.tuning.ascendingByPitch.first().physicalIndex,
+                autoMode = true,
             )
         }
     }
@@ -262,7 +284,7 @@ class TunerViewModel(application: Application) : AndroidViewModel(application) {
 
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     fun startListening() {
-        if (listenJob?.isActive == true) return
+        if (listenJob?.isActive == true || demoJob?.isActive == true) return
         silentFrames = 0
         _uiState.update { it.copy(isListening = true) }
         listenJob = viewModelScope.launch {
@@ -287,6 +309,8 @@ class TunerViewModel(application: Application) : AndroidViewModel(application) {
     fun stopListening() {
         listenJob?.cancel()
         listenJob = null
+        demoJob?.cancel()
+        demoJob = null
         stopReferenceTone()
         inTuneTracker.reset()
         _reading.value = null
@@ -419,6 +443,49 @@ class TunerViewModel(application: Application) : AndroidViewModel(application) {
         _holdProgress.value = 0f
         _uiState.update { it.copy(tunedStringIndices = tuned, activeStringIndex = next.physicalIndex) }
         _events.tryEmit(TunerEvent.AdvancedTo(next.physicalIndex))
+    }
+
+    /**
+     * Debug builds only: plays a scripted pitch through the same path a microphone frame takes
+     * after detection, so every state of the screen can be looked at without a guitar.
+     *
+     * [script] is one of `sweep`, `flat`, `sharp`, `tuned`, `alltuned` or `silent`. The audio
+     * pipeline is not exercised here, the unit tests do that with synthetic strings; this is
+     * for the display.
+     */
+    fun runDemo(script: String, stringIndex: Int) {
+        if (!nl.markmaaktmedia.guitartuner.BuildConfig.DEBUG) return
+        stopListening()
+        demoJob?.cancel()
+        _uiState.update { state ->
+            val index = if (stringIndex in state.tuning.strings.indices) stringIndex else state.activeStringIndex
+            state.copy(
+                isListening = true,
+                autoMode = false,
+                activeStringIndex = index,
+                tunedStringIndices = if (script == "alltuned") state.tuning.strings.indices.toSet() else state.tunedStringIndices,
+            )
+        }
+        if (script == "silent" || script == "alltuned") return
+        demoJob = viewModelScope.launch {
+            val started = SystemClock.elapsedRealtime()
+            while (true) {
+                val now = SystemClock.elapsedRealtime()
+                val seconds = (now - started) / 1000f
+                val cents = when (script) {
+                    "flat" -> -18f + 1.2f * kotlin.math.sin(seconds * 7f)
+                    "sharp" -> 27f + 1.2f * kotlin.math.sin(seconds * 7f)
+                    "tuned" -> 0.8f * kotlin.math.sin(seconds * 5f)
+                    else -> 46f * kotlin.math.sin(seconds * 0.8f)
+                }
+                val state = _uiState.value
+                val target = state.activeString.targetHz(state.referenceHz)
+                val frequency = target * Math.pow(2.0, cents / 1200.0).toFloat()
+                _inputLevelDb.value = -24f + 4f * kotlin.math.sin(seconds * 9f)
+                handlePitch(frequency, 0.96f, -24f, true, now)
+                delay(47)
+            }
+        }
     }
 
     override fun onCleared() {

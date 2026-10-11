@@ -3,6 +3,8 @@ agp = "9.3.1"
 kotlin = "2.4.10"
 
 coreKtx = "1.19.0"
+appcompat = "1.7.1"
+material = "1.13.0"
 lifecycle = "2.11.0"
 activityCompose = "1.13.0"
 composeBom = "2026.06.01"
@@ -15,6 +17,10 @@ espresso = "3.7.0"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
+androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
+# Only for the colour utilities (DynamicScheme, Hct and the scheme classes): the palette styles
+# in Settings are generated with them, and the platform exposes nothing but Tonal Spot.
+google-material = { module = "com.google.android.material:material", version.ref = "material" }
 androidx-lifecycle-runtime-ktx = { module = "androidx.lifecycle:lifecycle-runtime-ktx", version.ref = "lifecycle" }
 androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }
 androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }

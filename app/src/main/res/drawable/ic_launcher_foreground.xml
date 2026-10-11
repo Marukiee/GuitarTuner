@@ -1,34 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-  A tuning fork, drawn to sit in the same family as the MarkMySteps compass and the
-  Local AI capsule: one geometric mark, centred, on the shared slate square.
-
-  Everything is expressed as a stroke rather than a filled body. The compass is a thin
-  ring and the capsule is a short bar, so both spread their ink along an outline; a
-  solid fork would pack the same area into a blob and read heavier next to them even at
-  a matching width. 7.5 units of stroke on this 108 canvas puts the total ink at roughly
-  900 square units against the compass's 960.
-
-  Coordinates are final viewport units so the centring can be checked by reading them.
-  Half strokes and round caps included, the visible bounds run 39.25..68.75 across and
-  24.25..83.75 down, both centred on 54 and inside the 66 unit safe circle.
--->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Both tines and the U that joins them, in one stroke. -->
-    <path
-        android:pathData="M43,28 L43,54 A11,11 0 0 0 65,54 L65,28"
-        android:strokeColor="@color/ic_launcher_mark"
-        android:strokeWidth="7.5"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round" />
-    <!-- The stem. It starts inside the U so the two shapes read as one piece of metal. -->
-    <path
-        android:pathData="M54,63 L54,80"
-        android:strokeColor="@color/ic_launcher_mark"
-        android:strokeWidth="7.5"
-        android:strokeLineCap="round" />
+    <!-- The same plate geometry as the Mac icons: the visible 72dp of an adaptive icon stands for
+         the 824 point plate. The pitch line is behind, the pick in front, each with a soft shadow. -->
+    <group android:translateY="1.6">
+        <path android:fillColor="#000000" android:fillAlpha="0.22" android:pathData="M75.41,53.30L75.41,33.03C75.41,29.75 72.75,27.09 69.47,27.09L69.47,27.09C66.18,27.09 63.52,29.75 63.52,33.03L63.52,73.57C63.52,76.85 66.18,79.51 69.47,79.51L69.47,79.51C72.75,79.51 75.41,76.85 75.41,73.57Z" />
+    </group>
+    <path android:pathData="M75.41,53.30L75.41,33.03C75.41,29.75 72.75,27.09 69.47,27.09L69.47,27.09C66.18,27.09 63.52,29.75 63.52,33.03L63.52,73.57C63.52,76.85 66.18,79.51 69.47,79.51L69.47,79.51C72.75,79.51 75.41,76.85 75.41,73.57Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:startX="54" android:startY="79.51" android:endX="54" android:endY="27.09" android:type="linear">
+                <item android:offset="0" android:color="#FFB0CB" />
+                <item android:offset="1" android:color="#E8779F" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <group android:translateY="1.6">
+        <path android:fillColor="#000000" android:fillAlpha="0.22" android:pathData="M41.33,39.41L41.33,39.41C36.50,39.41 32.59,43.32 32.59,48.15C32.59,50.13 33.27,52.05 34.51,53.60L44.99,66.71L44.99,66.71C48.01,70.48 53.51,71.09 57.27,68.08C57.78,67.67 58.24,67.21 58.64,66.71L69.12,53.60L69.12,53.60C72.14,49.84 71.53,44.34 67.76,41.32C66.21,40.08 64.28,39.41 62.30,39.41Z" />
+    </group>
+    <path android:pathData="M41.33,39.41L41.33,39.41C36.50,39.41 32.59,43.32 32.59,48.15C32.59,50.13 33.27,52.05 34.51,53.60L44.99,66.71L44.99,66.71C48.01,70.48 53.51,71.09 57.27,68.08C57.78,67.67 58.24,67.21 58.64,66.71L69.12,53.60L69.12,53.60C72.14,49.84 71.53,44.34 67.76,41.32C66.21,40.08 64.28,39.41 62.30,39.41Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:startX="54" android:startY="69.99" android:endX="54" android:endY="39.41" android:type="linear">
+                <item android:offset="0" android:color="#FFFFFF" />
+                <item android:offset="1" android:color="#C9C8FA" />
+            </gradient>
+        </aapt:attr>
+    </path>
 </vector>

@@ -61,4 +61,10 @@ object TunerIcons {
     val Code: Painter @Composable get() = painterResource(R.drawable.sym_code)
     val Shield: Painter @Composable get() = painterResource(R.drawable.sym_shield)
     val Idea: Painter @Composable get() = painterResource(R.drawable.sym_lightbulb)
+    val Language: Painter @Composable get() = painterResource(R.drawable.sym_language)
+    val History: Painter @Composable get() = painterResource(R.drawable.sym_history)
+    val Vibration: Painter @Composable get() = painterResource(R.drawable.sym_vibration)
+    val Phone: Painter @Composable get() = painterResource(R.drawable.sym_smartphone)
+    val Image: Painter @Composable get() = painterResource(R.drawable.sym_image)
+    val Eye: Painter @Composable get() = painterResource(R.drawable.sym_visibility)
 }

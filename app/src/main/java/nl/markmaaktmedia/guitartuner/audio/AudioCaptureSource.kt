@@ -13,6 +13,8 @@ import android.media.audiofx.AutomaticGainControl
 import android.media.audiofx.NoiseSuppressor
 import android.util.Log
 import androidx.annotation.RequiresPermission
+import androidx.annotation.StringRes
+import nl.markmaaktmedia.guitartuner.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.awaitClose
@@ -38,11 +40,16 @@ import kotlinx.coroutines.launch
  * only source Android guarantees will bypass gain control and noise suppression, and
  * both of those shift a reading by several cents and cut a decaying note short.
  */
-enum class MicSource(val label: String, val androidSource: Int) {
-    Unprocessed("Unprocessed", MediaRecorder.AudioSource.UNPROCESSED),
-    VoiceRecognition("Voice rec.", MediaRecorder.AudioSource.VOICE_RECOGNITION),
-    Main("Main mic", MediaRecorder.AudioSource.MIC),
-    Camcorder("Rear mic", MediaRecorder.AudioSource.CAMCORDER),
+enum class MicSource(
+    @StringRes val labelRes: Int,
+    /** Which physical capsule this tends to select, in words, because the name says nothing. */
+    @StringRes val descriptionRes: Int,
+    val androidSource: Int,
+) {
+    Unprocessed(R.string.mic_unprocessed, R.string.mic_unprocessed_sub, MediaRecorder.AudioSource.UNPROCESSED),
+    VoiceRecognition(R.string.mic_voice, R.string.mic_voice_sub, MediaRecorder.AudioSource.VOICE_RECOGNITION),
+    Main(R.string.mic_main, R.string.mic_main_sub, MediaRecorder.AudioSource.MIC),
+    Camcorder(R.string.mic_rear, R.string.mic_rear_sub, MediaRecorder.AudioSource.CAMCORDER),
 }
 
 /**
@@ -106,7 +113,7 @@ class AudioCaptureSource(
             bufferBytes,
         )
         check(record.state == AudioRecord.STATE_INITIALIZED) {
-            "AudioRecord failed to initialise for ${source.label}"
+            "AudioRecord failed to initialise for ${source.name}"
         }
 
         // A plugged in USB or wired mic should always win over anything built in.

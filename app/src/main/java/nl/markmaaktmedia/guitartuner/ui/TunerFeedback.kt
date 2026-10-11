@@ -44,6 +44,10 @@ class TunerFeedback(context: Context) {
     @Volatile
     private var chimeReady = false
 
+    /** Mirrors the two switches in Settings; the feedback is silent and still when they are off. */
+    @Volatile var chimeEnabled = true
+    @Volatile var hapticsEnabled = true
+
     private val chimeId = soundPool
         .also { pool ->
             pool.setOnLoadCompleteListener { _, _, status ->
@@ -64,7 +68,7 @@ class TunerFeedback(context: Context) {
         ?: @Suppress("DEPRECATION") context.getSystemService(Vibrator::class.java)
 
     fun stringTuned() {
-        if (chimeReady) {
+        if (chimeEnabled && chimeReady) {
             soundPool.play(chimeId, 1f, 1f, 1, 0, 1f)
         } else {
             Log.i(TAG, "Chime not decoded yet, skipping")
@@ -81,10 +85,11 @@ class TunerFeedback(context: Context) {
      * one moment they should not have to.
      */
     fun allTuned() {
-        if (chimeReady) {
+        if (chimeEnabled && chimeReady) {
             soundPool.play(chimeId, 1f, 1f, 1, 0, 1f)
             soundPool.play(chimeId, 0.9f, 0.9f, 1, 0, 1.5f)
         }
+        if (!hapticsEnabled) return
         val vibrator = vibrator ?: return
         if (!vibrator.hasVibrator()) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
@@ -105,6 +110,7 @@ class TunerFeedback(context: Context) {
     }
 
     private fun playSuccessHaptic() {
+        if (!hapticsEnabled) return
         val vibrator = vibrator ?: return
         if (!vibrator.hasVibrator()) return
 

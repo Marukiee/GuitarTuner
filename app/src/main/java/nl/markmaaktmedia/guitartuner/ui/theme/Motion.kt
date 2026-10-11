@@ -21,6 +21,9 @@ object TunerMotion {
     /** The house easing: fast out of the gate, long settle. */
     val Standard = CubicBezierEasing(0.22f, 1f, 0.36f, 1f)
 
+    /** For something arriving that should feel deliberate rather than quick. */
+    val Emphasised = CubicBezierEasing(0.2f, 0f, 0f, 1f)
+
     const val DurationFast = 140
     const val DurationMedium = 260
     const val DurationSlow = 420
@@ -68,4 +71,7 @@ object TunerMotion {
 
     /** How far a pressed element shrinks. Small enough to feel, not to distract. */
     const val PressedScale = 0.96f
+
+    /** The pick spinner: two eased turns, with a breath between them. */
+    const val SpinnerCycleMillis = 2600
 }

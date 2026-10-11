@@ -31,9 +31,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import nl.markmaaktmedia.guitartuner.R
 import nl.markmaaktmedia.guitartuner.domain.model.Instrument
 import nl.markmaaktmedia.guitartuner.domain.model.Tuning
 import nl.markmaaktmedia.guitartuner.ui.theme.CardSquircle
@@ -76,7 +78,7 @@ fun InstrumentSheet(
                 .navigationBarsPadding()
                 .padding(bottom = 20.dp),
         ) {
-            SheetHeading("Instrument")
+            SheetHeading(stringResource(R.string.sheet_instrument))
             LazyRow(
                 state = listState,
                 contentPadding = PaddingValues(horizontal = 20.dp),
@@ -92,7 +94,7 @@ fun InstrumentSheet(
             }
 
             Spacer(Modifier.height(24.dp))
-            SheetHeading("Tuning")
+            SheetHeading(stringResource(R.string.sheet_tuning))
             Column(
                 modifier = Modifier.padding(horizontal = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(GroupedSpacing),
@@ -109,8 +111,7 @@ fun InstrumentSheet(
 
             if (tuning.isReentrant) {
                 Text(
-                    text = "This tuning is re-entrant: the strings are not in rising order, so " +
-                        "auto advance follows pitch rather than the pegs.",
+                    text = stringResource(R.string.reentrant_note),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
@@ -154,7 +155,7 @@ private fun InstrumentCard(
                 color = if (selected) scheme.primary else scheme.surfaceContainerHigh,
                 shape = CardSquircle,
             )
-            .bouncyClickable(onClickLabel = instrument.displayName, onClick = onClick)
+            .bouncyClickable(onClickLabel = stringResource(instrument.nameRes), onClick = onClick)
             .padding(vertical = 14.dp, horizontal = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -173,7 +174,7 @@ private fun InstrumentCard(
             modifier = Modifier.size(width = 48.dp, height = 66.dp),
         )
         Text(
-            text = instrument.shortName,
+            text = stringResource(instrument.shortNameRes),
             style = MaterialTheme.typography.labelMedium,
             color = content,
             maxLines = 1,
@@ -202,13 +203,13 @@ private fun TuningRow(
             .fillMaxWidth()
             .clip(shape)
             .background(container)
-            .bouncyClickable(onClickLabel = tuning.displayName, onClick = onClick)
+            .bouncyClickable(onClickLabel = stringResource(tuning.nameRes), onClick = onClick)
             .padding(horizontal = 18.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
             Text(
-                text = tuning.displayName,
+                text = stringResource(tuning.nameRes),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
                 color = content,

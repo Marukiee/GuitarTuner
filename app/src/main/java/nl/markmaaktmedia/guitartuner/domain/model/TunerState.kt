@@ -2,6 +2,7 @@ package nl.markmaaktmedia.guitartuner.domain.model
 
 import androidx.compose.runtime.Immutable
 import nl.markmaaktmedia.guitartuner.audio.MicSource
+import nl.markmaaktmedia.guitartuner.ui.theme.Appearance
 import kotlin.math.abs
 
 /** Raw output of the pitch detector for one analysis window. Emitted at ~21 Hz. */
@@ -96,9 +97,10 @@ data class TunerUiState(
     val micSource: MicSource = MicSource.VoiceRecognition,
     /** True once the user has chosen a source by hand, which stops the automatic fallback. */
     val micSourcePinned: Boolean = false,
-    val themeMode: ThemeMode = ThemeMode.System,
-    val dynamicColor: Boolean = true,
-    val pureBlack: Boolean = true,
+    val appearance: Appearance = Appearance(),
+    val keepScreenOn: Boolean = true,
+    val chime: Boolean = true,
+    val haptics: Boolean = true,
     /** Developer option: force the update banner on so it can be inspected. */
     val bannerPreview: Boolean = false,
 ) {

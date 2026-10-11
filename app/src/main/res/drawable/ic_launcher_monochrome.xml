@@ -1,19 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Themed icon layer. The launcher tints this, so it stays one flat colour. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:pathData="M43,28 L43,54 A11,11 0 0 0 65,54 L65,28"
-        android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="7.5"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round" />
-    <path
-        android:pathData="M54,63 L54,80"
-        android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="7.5"
-        android:strokeLineCap="round" />
+    <!-- One tint, two shapes: a thin gap is cut round the pick so the pitch line stays apart from it. -->
+    <group>
+        <clip-path android:pathData="M0,0H108V108H0ZM41.33,38.18L41.33,38.18C35.83,38.18 31.37,42.64 31.37,48.15C31.37,50.41 32.14,52.60 33.55,54.37L44.04,67.47L44.04,67.47C47.47,71.77 53.74,72.47 58.04,69.03C58.61,68.57 59.13,68.05 59.59,67.47L70.08,54.37L70.08,54.37C73.52,50.07 72.82,43.80 68.52,40.37C66.76,38.95 64.56,38.18 62.30,38.18Z" />
+        <path android:fillColor="#FF000000" android:pathData="M75.41,53.30L75.41,33.03C75.41,29.75 72.75,27.09 69.47,27.09L69.47,27.09C66.18,27.09 63.52,29.75 63.52,33.03L63.52,73.57C63.52,76.85 66.18,79.51 69.47,79.51L69.47,79.51C72.75,79.51 75.41,76.85 75.41,73.57Z" />
+    </group>
+    <path android:fillColor="#FF000000" android:pathData="M41.33,39.41L41.33,39.41C36.50,39.41 32.59,43.32 32.59,48.15C32.59,50.13 33.27,52.05 34.51,53.60L44.99,66.71L44.99,66.71C48.01,70.48 53.51,71.09 57.27,68.08C57.78,67.67 58.24,67.21 58.64,66.71L69.12,53.60L69.12,53.60C72.14,49.84 71.53,44.34 67.76,41.32C66.21,40.08 64.28,39.41 62.30,39.41Z" />
 </vector>

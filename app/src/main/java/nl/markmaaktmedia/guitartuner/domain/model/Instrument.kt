@@ -1,5 +1,8 @@
 package nl.markmaaktmedia.guitartuner.domain.model
 
+import androidx.annotation.StringRes
+import nl.markmaaktmedia.guitartuner.R
+
 /**
  * One course of the instrument.
  *
@@ -54,95 +57,103 @@ enum class HeadstockLayout {
 enum class HeadstockScale { SMALL, MEDIUM, LARGE }
 
 enum class Instrument(
-    val displayName: String,
+    @StringRes val nameRes: Int,
     /**
      * The name on a picker card, which is 112dp wide and has room for one line.
      * "Acoustic guitar" wraps there and a wrapped label under a drawing looks like a
      * mistake, so the card drops the word every entry in that row shares anyway.
      */
-    val shortName: String,
+    @StringRes val shortNameRes: Int,
     /** One line in the picker saying what actually differs about this instrument. */
-    val subtitle: String,
+    @StringRes val subtitleRes: Int,
     val layout: HeadstockLayout,
     val headstockScale: HeadstockScale,
     val tunings: List<Tuning>,
 ) {
     ACOUSTIC(
-        displayName = "Acoustic guitar",
-        shortName = "Acoustic",
-        subtitle = "Six strings, slotted 3+3 head",
+        nameRes = R.string.instrument_acoustic,
+        shortNameRes = R.string.instrument_acoustic_short,
+        subtitleRes = R.string.instrument_acoustic_sub,
         layout = HeadstockLayout.THREE_PER_SIDE,
         headstockScale = HeadstockScale.MEDIUM,
         tunings = Tunings.acousticGuitar,
     ),
     ELECTRIC(
-        displayName = "Electric guitar",
-        shortName = "Electric",
-        subtitle = "Six strings, six in a line",
+        nameRes = R.string.instrument_electric,
+        shortNameRes = R.string.instrument_electric_short,
+        subtitleRes = R.string.instrument_electric_sub,
         layout = HeadstockLayout.INLINE,
         headstockScale = HeadstockScale.MEDIUM,
         tunings = Tunings.electricGuitar,
     ),
     GUITAR_7(
-        displayName = "7-string guitar",
-        shortName = "7-string",
-        subtitle = "A low B under standard tuning",
+        nameRes = R.string.instrument_guitar_7,
+        shortNameRes = R.string.instrument_guitar_7_short,
+        subtitleRes = R.string.instrument_guitar_7_sub,
         layout = HeadstockLayout.FOUR_THREE,
         headstockScale = HeadstockScale.MEDIUM,
         tunings = Tunings.sevenString,
     ),
     BASS_4(
-        displayName = "Bass",
-        shortName = "Bass",
-        subtitle = "Four strings, an octave below the guitar",
+        nameRes = R.string.instrument_bass_4,
+        shortNameRes = R.string.instrument_bass_4_short,
+        subtitleRes = R.string.instrument_bass_4_sub,
         layout = HeadstockLayout.TWO_PER_SIDE,
         headstockScale = HeadstockScale.LARGE,
         tunings = Tunings.bassFour,
     ),
     BASS_5(
-        displayName = "5-string bass",
-        shortName = "Bass 5",
-        subtitle = "Down to a low B at 31 Hz",
+        nameRes = R.string.instrument_bass_5,
+        shortNameRes = R.string.instrument_bass_5_short,
+        subtitleRes = R.string.instrument_bass_5_sub,
         layout = HeadstockLayout.INLINE,
         headstockScale = HeadstockScale.LARGE,
         tunings = Tunings.bassFive,
     ),
+    BASS_6(
+        nameRes = R.string.instrument_bass_6,
+        shortNameRes = R.string.instrument_bass_6_short,
+        subtitleRes = R.string.instrument_bass_6_sub,
+        layout = HeadstockLayout.INLINE,
+        headstockScale = HeadstockScale.LARGE,
+        tunings = Tunings.bassSix,
+    ),
     UKULELE(
-        displayName = "Ukulele",
-        shortName = "Ukulele",
-        subtitle = "Four strings, re-entrant by default",
+        nameRes = R.string.instrument_ukulele,
+        shortNameRes = R.string.instrument_ukulele_short,
+        subtitleRes = R.string.instrument_ukulele_sub,
         layout = HeadstockLayout.TWO_PER_SIDE,
         headstockScale = HeadstockScale.SMALL,
         tunings = Tunings.ukulele,
     ),
     BANJO(
-        displayName = "Banjo",
-        shortName = "Banjo",
-        subtitle = "Five strings, the drone tuned off the neck",
+        nameRes = R.string.instrument_banjo,
+        shortNameRes = R.string.instrument_banjo_short,
+        subtitleRes = R.string.instrument_banjo_sub,
         layout = HeadstockLayout.BANJO,
         headstockScale = HeadstockScale.MEDIUM,
         tunings = Tunings.banjo,
     ),
     MANDOLIN(
-        displayName = "Mandolin",
-        shortName = "Mandolin",
-        subtitle = "Four courses in fifths, strung in pairs",
+        nameRes = R.string.instrument_mandolin,
+        shortNameRes = R.string.instrument_mandolin_short,
+        subtitleRes = R.string.instrument_mandolin_sub,
         layout = HeadstockLayout.PAIRED_FOUR,
         headstockScale = HeadstockScale.SMALL,
         tunings = Tunings.mandolin,
     ),
     VIOLIN(
-        displayName = "Violin",
-        shortName = "Violin",
-        subtitle = "Four strings in fifths, pegbox and scroll",
+        nameRes = R.string.instrument_violin,
+        shortNameRes = R.string.instrument_violin_short,
+        subtitleRes = R.string.instrument_violin_sub,
         layout = HeadstockLayout.SCROLL,
         headstockScale = HeadstockScale.MEDIUM,
         tunings = Tunings.violin,
     ),
     CELLO(
-        displayName = "Cello",
-        shortName = "Cello",
-        subtitle = "An octave and a fifth below the violin",
+        nameRes = R.string.instrument_cello,
+        shortNameRes = R.string.instrument_cello_short,
+        subtitleRes = R.string.instrument_cello_sub,
         layout = HeadstockLayout.SCROLL,
         headstockScale = HeadstockScale.LARGE,
         tunings = Tunings.cello,

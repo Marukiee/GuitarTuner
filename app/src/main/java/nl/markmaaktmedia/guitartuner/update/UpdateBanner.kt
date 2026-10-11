@@ -1,172 +1,199 @@
 package nl.markmaaktmedia.guitartuner.update
 
-import android.content.Intent
-import android.net.Uri
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.CubicBezierEasing
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
-import nl.markmaaktmedia.guitartuner.ui.theme.TunerIcons
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.LifecycleResumeEffect
-import kotlinx.coroutines.launch
 import nl.markmaaktmedia.guitartuner.R
+import nl.markmaaktmedia.guitartuner.ui.components.PickSpinner
+import nl.markmaaktmedia.guitartuner.ui.components.bouncyClickable
+import nl.markmaaktmedia.guitartuner.ui.theme.CardSquircle
+import nl.markmaaktmedia.guitartuner.ui.theme.PillShape
+import nl.markmaaktmedia.guitartuner.ui.theme.TunerIcons
+import nl.markmaaktmedia.guitartuner.ui.theme.TunerMotion
 
 /**
- * "Nieuwe versie beschikbaar" bar, visually and behaviourally the same as the one in
- * MarkMySteps: a full width strip that runs up underneath the transparent status bar, floats
- * over the page rather than pushing it down, rolls away when dismissed, and remembers the
- * dismissal per version so it does not nag about the same build twice.
+ * "New version available": a card that floats over the top of the screen instead of pushing the
+ * tuner down, with the download in it.
  *
- * The one deliberate difference: MarkMySteps hardcodes its brand orange, while this app is a
- * Material You app, so the strip takes [MaterialTheme.colorScheme].primary and follows the
- * wallpaper. Layout, sizes and motion are unchanged.
+ * Pressing Download fetches the build inside the app and opens the system installer on it, and
+ * the button is the progress: one pill of one width that says Download, then the percentage,
+ * then hands over to the installer. It never changes size, so nothing beside it moves while
+ * the number counts up.
  *
- * @param forceShow developer option: render the bar with dummy content so it can be checked
+ * It remembers a dismissal per version, so it does not nag about the same build twice.
+ *
+ * @param forceShow developer option: render the card with dummy content so it can be checked
  *        without publishing a release.
  */
 @Composable
 fun UpdateBanner(
+    controller: UpdateController,
     modifier: Modifier = Modifier,
     forceShow: Boolean = false,
 ) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val checker = remember(context) { UpdateChecker(context) }
-
-    var release by remember { mutableStateOf<AppRelease?>(null) }
-
-    // A release published while the app was open should still surface, so re-check on every
+    // A release published while the app was open should still surface, so ask again on every
     // resume and not only on first composition.
     LifecycleResumeEffect(Unit) {
-        val job = scope.launch {
-            val status = checker.check()
-            release = status.latest.takeIf { status.isNewer }
-        }
-        onPauseOrDispose { job.cancel() }
+        controller.checkOnOpen()
+        onPauseOrDispose { }
     }
 
-    val shown = if (forceShow) PREVIEW_RELEASE else release
+    val shown = if (forceShow) PreviewRelease else controller.release
 
     AnimatedVisibility(
         visible = shown != null,
         modifier = modifier.fillMaxWidth().zIndex(50f),
-        enter = fadeIn(tween(420, easing = Ease)) +
-            slideInVertically(tween(420, easing = Ease)) { -it / 4 },
-        exit = fadeOut(tween(280, easing = Ease)) +
-            slideOutVertically(tween(280, easing = Ease)) { -it / 4 },
+        enter = fadeIn(TunerMotion.fadeSpec()) + slideInVertically(TunerMotion.spatial()) { -it },
+        exit = fadeOut(TunerMotion.fadeSpec()) + slideOutVertically(TunerMotion.spatial()) { -it },
     ) {
         val info = shown ?: return@AnimatedVisibility
-        Surface(
-            color = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary,
-            shadowElevation = 6.dp,
-            modifier = Modifier.fillMaxWidth(),
+        BannerCard(info = info, controller = controller, preview = forceShow)
+    }
+}
+
+@Composable
+private fun BannerCard(info: AppRelease, controller: UpdateController, preview: Boolean) {
+    val scheme = MaterialTheme.colorScheme
+    val state = controller.download
+
+    Row(
+        modifier = Modifier
+            .statusBarsPadding()
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .shadow(8.dp, CardSquircle, clip = false)
+            .clip(CardSquircle)
+            .background(scheme.primaryContainer)
+            .padding(start = 14.dp, end = 8.dp, top = 10.dp, bottom = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(
+            Modifier.size(40.dp).clip(CircleShape).background(scheme.primary),
+            contentAlignment = Alignment.Center,
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    // Top padding clears the status bar the banner runs underneath.
-                    .windowInsetsPadding(WindowInsets.statusBars)
-                    .padding(start = 16.dp, end = 16.dp, top = 11.dp, bottom = 11.dp),
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(R.string.update_available),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.5.sp,
-                        lineHeight = 18.sp,
-                    )
-                    info.notes?.let { notes ->
+            Icon(TunerIcons.Update, null, tint = scheme.onPrimary, modifier = Modifier.size(20.dp))
+        }
+
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            Text(
+                text = stringResource(R.string.update_available),
+                style = MaterialTheme.typography.titleSmall,
+                color = scheme.onPrimaryContainer,
+                maxLines = 1,
+            )
+            Text(
+                text = (state as? DownloadState.Failed)?.let { stringResource(R.string.update_download_failed) }
+                    ?: info.notes
+                    ?: info.name,
+                style = MaterialTheme.typography.bodySmall,
+                color = scheme.onPrimaryContainer.copy(alpha = 0.75f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+
+        DownloadPill(
+            state = state,
+            onClick = { if (!preview) controller.install(info) },
+        )
+
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(36.dp)
+                .clip(CircleShape)
+                .bouncyClickable(onClickLabel = stringResource(R.string.hide), onClick = { controller.dismiss() }),
+        ) {
+            Icon(
+                TunerIcons.Close,
+                contentDescription = stringResource(R.string.hide),
+                tint = scheme.onPrimaryContainer,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+    }
+}
+
+/** One pill, one width: Download, then how far along it is. */
+@Composable
+private fun DownloadPill(state: DownloadState, onClick: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    val busy = state is DownloadState.Downloading
+    val container by animateColorAsState(
+        targetValue = if (busy) scheme.surfaceContainerHighest else scheme.primary,
+        animationSpec = TunerMotion.colourSpec(),
+        label = "downloadContainer",
+    )
+    val ink by animateColorAsState(
+        targetValue = if (busy) scheme.onSurface else scheme.onPrimary,
+        animationSpec = TunerMotion.colourSpec(),
+        label = "downloadInk",
+    )
+
+    Row(
+        modifier = Modifier
+            .width(118.dp)
+            .height(40.dp)
+            .clip(PillShape)
+            .background(container)
+            .bouncyClickable(enabled = !busy, onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+    ) {
+        AnimatedContent(
+            targetState = state,
+            contentKey = { it::class },
+            transitionSpec = { fadeIn(TunerMotion.fadeSpec()) togetherWith fadeOut(TunerMotion.fadeSpec()) },
+            label = "downloadPill",
+        ) { current ->
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                when (current) {
+                    is DownloadState.Downloading -> {
+                        PickSpinner(size = 20.dp, color = ink)
                         Text(
-                            text = notes,
-                            fontSize = 13.sp,
-                            lineHeight = 17.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
+                            text = if (current.progress >= 0f) "${(current.progress * 100).toInt()}%" else "",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = ink,
                         )
                     }
-                }
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(percent = 50))
-                            .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f))
-                            .clickable {
-                                context.startActivity(
-                                    Intent(Intent.ACTION_VIEW, Uri.parse(info.apkUrl))
-                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                                )
-                            }
-                            .padding(horizontal = 13.dp, vertical = 7.dp),
-                    ) {
-                        Icon(TunerIcons.Download, contentDescription = null, Modifier.size(15.dp))
+                    else -> {
+                        Icon(TunerIcons.Download, null, tint = ink, modifier = Modifier.size(18.dp))
                         Text(
                             text = stringResource(R.string.download),
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 13.5.sp,
-                        )
-                    }
-
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(CircleShape)
-                            .clickable {
-                                checker.dismiss(info.versionCode)
-                                release = null
-                            },
-                    ) {
-                        Icon(
-                            TunerIcons.Close,
-                            contentDescription = stringResource(R.string.hide),
-                            Modifier.size(16.dp),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = ink,
+                            maxLines = 1,
                         )
                     }
                 }
@@ -175,12 +202,9 @@ fun UpdateBanner(
     }
 }
 
-/** Matches the `--ease` curve MarkMySteps uses for the same bar. */
-private val Ease = CubicBezierEasing(0.2f, 0f, 0f, 1f)
-
-private val PREVIEW_RELEASE = AppRelease(
+private val PreviewRelease = AppRelease(
     versionCode = 9999,
     name = "Build 9999",
-    notes = "Testmelding uit ontwikkelaarsopties",
+    notes = null,
     apkUrl = "https://github.com/Marukiee/GuitarTuner/releases/latest",
 )

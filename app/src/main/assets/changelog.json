@@ -1,0 +1,34 @@
+[
+  {
+    "version": "1.0.19",
+    "date": "2026-10-12",
+    "en": {
+      "title": "A new look",
+      "new": [
+        "A line tuner: a bubble slides along the line with a trail behind it",
+        "A wooden head with a bubble for every string: tap one to tune it, tap again for auto, hold to hear it",
+        "Tap the note to hear it, tap it again when every string is done to start over",
+        "Colours, light or dark and language in Settings, like the other apps",
+        "What's new page and downloading updates inside the app",
+        "Dutch translation and a new app icon"
+      ],
+      "better": [
+        "More instruments and tunings"
+      ]
+    },
+    "nl": {
+      "title": "Een nieuw uiterlijk",
+      "new": [
+        "Een lijntuner: een bel schuift langs de lijn met een spoor erachter",
+        "Een houten kop met een bel voor elke snaar: tik om te stemmen, tik nog eens voor automatisch, houd ingedrukt om te horen",
+        "Tik op de noot om hem te horen, en als alle snaren klaar zijn opnieuw beginnen",
+        "Kleuren, licht of donker en taal in Instellingen, net als de andere apps",
+        "Pagina Wat is er nieuw en updates downloaden in de app",
+        "Nederlandse vertaling en een nieuw app-icoon"
+      ],
+      "better": [
+        "Meer instrumenten en stemmingen"
+      ]
+    }
+  }
+]

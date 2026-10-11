@@ -84,7 +84,7 @@ private fun HeadstockScale.pegFactor(): Float = when (this) {
  * stylistic choice, it is the only assignment with no crossings, and it holds for a column
  * of two, of three, or for six in a line down one edge.
  */
-private data class HeadSpec(
+internal data class HeadSpec(
     val crownLeft: Float,
     val crownRight: Float,
     val waistLeft: Float,
@@ -128,12 +128,12 @@ private data class HeadSpec(
  * like: the posts sit a couple of millimetres outside a nut nearly as wide as they are, not
  * out at the edges of the paddle.
  */
-private fun pegEdge(nutSpread: Float): Float = 0.5f + nutSpread / 2f
+internal fun pegEdge(nutSpread: Float): Float = 0.5f + nutSpread / 2f
 
 /** The Fender post line, out at the bass edge rather than beside the nut. */
 private const val INLINE_POST_X = 0.29f
 
-private fun specFor(layout: HeadstockLayout, stringCount: Int): HeadSpec = when (layout) {
+internal fun specFor(layout: HeadstockLayout, stringCount: Int): HeadSpec = when (layout) {
     HeadstockLayout.THREE_PER_SIDE -> {
         // A slotted head: wide, gently flared, symmetric.
         val perSide = stringCount / 2
@@ -311,12 +311,9 @@ private fun DrawScope.drawHead(
     val insetX = (size.width - w) / 2f
     val insetY = size.height - h
     // Every fraction in a [HeadSpec] is written left to right off a photograph, which is the
-    // front of the instrument: bass side on the left, the way a chord chart is drawn. The head
-    // is then mirrored on the way to the canvas, because this drawing is not a chord chart. It
-    // is shown to someone holding the instrument, and from behind the neck the bass side is on
-    // the right, so an unmirrored head sends the low string off the wrong edge and hangs the
-    // treble strings on the tuners the player can see are not theirs.
-    fun x(fraction: Float) = insetX + (1f - fraction) * w
+    // front of the instrument: bass side on the left, the way a chord chart is drawn and the way
+    // the tuner apps this one follows show it. It is drawn exactly as written.
+    fun x(fraction: Float) = insetX + fraction * w
     fun y(fraction: Float) = insetY + fraction * h
 
     val bottom = spec.headBottom
@@ -414,7 +411,7 @@ private fun DrawScope.drawHead(
 }
 
 /** Where string [index] of [count] crosses the nut, as an x fraction. */
-private fun nutSlot(index: Int, count: Int, spec: HeadSpec): Float {
+internal fun nutSlot(index: Int, count: Int, spec: HeadSpec): Float {
     if (count <= 1) return 0.5f
     val half = spec.nutSpread / 2f
     if (!spec.paired) return 0.5f - half + spec.nutSpread * (index / (count - 1f))

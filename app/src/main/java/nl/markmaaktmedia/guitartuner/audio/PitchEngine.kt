@@ -26,28 +26,25 @@ data class AudioFrame(
 )
 
 /**
- * Capture, band limiting, detection and outlier rejection, as one flow of frames.
+ * The whole chain from raw blocks to readings, with no Android in it.
  *
- * The chain is: raw blocks from [AudioCaptureSource], through [DecimatingPreFilter] into
- * an 11.025 kHz analysis window, through the [PitchDetector], then through three filters
- * that exist because a plucked string is not a laboratory signal.
+ * The chain is: raw blocks, through [DecimatingPreFilter] into an 11.025 kHz analysis window,
+ * through the [PitchDetector], then through the [PitchStabiliser], which exists because a
+ * plucked string is not a laboratory signal. It lives apart from [PitchEngine] so a unit test
+ * can feed it synthetic strings, with noise and hum and a decaying attack, and measure what the
+ * app would have shown, which is the only honest way to know a tuner is accurate.
  *
- * **Median of five** over frequency erases the single frame jumps that survive peak
- * picking, at the cost of about two frames of lag.
- *
- * **The octave anchor and the adaptive smoothing** then live in [PitchStabiliser], which
- * is where the reasoning for both is written down.
- *
- * Deliberately no smoothing of the *displayed* value beyond this. The visual smoothing
- * belongs in Compose, where a spring interpolates between readings at display refresh rate
- * rather than at the 21 Hz analysis rate.
+ * Deliberately no smoothing of the *displayed* value beyond the stabiliser. The visual
+ * smoothing belongs in Compose, where a spring interpolates between readings at display
+ * refresh rate rather than at the 21 Hz analysis rate.
  */
-class PitchEngine(
-    private val capture: AudioCaptureSource,
+internal class PitchPipeline(
+    sampleRate: Int,
+    hopSize: Int,
     detectorFactory: (Int) -> PitchDetector = { rate -> McLeodPitchDetector(sampleRate = rate) },
 ) {
 
-    private val preFilter = DecimatingPreFilter(capture.sampleRate)
+    private val preFilter = DecimatingPreFilter(sampleRate)
 
     /** Sample rate the detector actually sees, after decimation. */
     val analysisRate: Int = preFilter.outputRate
@@ -55,55 +52,56 @@ class PitchEngine(
     private val detector: PitchDetector = detectorFactory(analysisRate)
 
     /** Decimated samples per emitted block. */
-    private val hopSize: Int = capture.hopSize / preFilter.factor
+    private val decimatedHop: Int = hopSize / preFilter.factor
 
     @Volatile
     private var windowSize: Int = DEFAULT_WINDOW
-
-    fun availableSources(): List<MicSource> = capture.availableSources()
 
     /**
      * Point the whole chain at one tuning.
      *
      * The window length is part of this and is not a constant. It is sized to hold about
-     * seven periods of the lowest note, which is what the NSDF needs for a stable peak,
-     * and no more: a violin's low G needs 65 ms of audio and a five string bass's low B
-     * needs 370 ms, so a single window length either makes the violin sluggish or makes
-     * the bass unreliable.
+     * seven periods of the lowest note, which is what the NSDF needs for a stable peak, and no
+     * more: a violin's low G needs 65 ms of audio and a five string bass's low B needs 370 ms,
+     * so a single window length either makes the violin sluggish or makes the bass unreliable.
      */
     fun configureFor(tuning: Tuning) {
         val minHz = tuning.minDetectableHz
         val maxHz = tuning.maxDetectableHz
         detector.setFrequencyRange(minHz, maxHz)
 
-        // Below the lowest fundamental is hum, handling noise and microphone rumble, and
-        // all of it lands in the lag range where a low note is looked for. Above three
-        // harmonics is structure the NSDF does not need and can trip over.
+        // Below the lowest fundamental is hum, handling noise and microphone rumble, and all of
+        // it lands in the lag range where a low note is looked for. Above three harmonics is
+        // structure the NSDF does not need and can trip over.
         //
-        // The high pass corner sits just under the flattest note still worth reporting,
-        // at 0.94 of it, rather than comfortably below. On a guitar that is 66 Hz, and
-        // the extra few Hz matter: at 0.72 the corner landed on 50 Hz itself, so the one
-        // interferer the filter exists to remove sat in its passband.
+        // The high pass corner sits just under the flattest note still worth reporting, at 0.94
+        // of it, rather than comfortably below. On a guitar that is 66 Hz, and the extra few Hz
+        // matter: at 0.72 the corner landed on 50 Hz itself, so the one interferer the filter
+        // exists to remove sat in its passband.
         preFilter.configure(lowHz = minHz * 0.94f, highHz = maxHz * 3.2f)
 
         val needed = PERIODS_PER_WINDOW * (analysisRate / minHz)
         windowSize = nextPowerOfTwo(needed.toInt()).coerceIn(MIN_WINDOW, MAX_WINDOW)
     }
 
-    @RequiresPermission(Manifest.permission.RECORD_AUDIO)
-    fun frames(source: MicSource): Flow<AudioFrame> = flow {
-        val state = PitchStabiliser()
-        var window = FloatArray(windowSize)
-        var filled = 0
-        val decimated = FloatArray(hopSize)
+    /** One run of the chain, with its own history. One per subscription, so none is shared. */
+    fun session(): Session = Session()
 
-        preFilter.reset()
+    inner class Session {
+        private val state = PitchStabiliser()
+        private var window = FloatArray(windowSize)
+        private var filled = 0
+        private val decimated = FloatArray(decimatedHop)
 
-        capture.hops(source).collect { block ->
+        init {
+            preFilter.reset()
+        }
+
+        fun accept(block: FloatArray): AudioFrame {
             val level = levelDbOf(block)
 
-            // A tuning change while the recorder runs resizes the window in place. Cheaper
-            // and less jarring than tearing down AudioRecord for it.
+            // A tuning change while the recorder runs resizes the window in place. Cheaper and
+            // less jarring than tearing down AudioRecord for it.
             if (window.size != windowSize) {
                 window = FloatArray(windowSize)
                 filled = 0
@@ -111,7 +109,7 @@ class PitchEngine(
             }
 
             val produced = preFilter.process(block, decimated)
-            if (produced <= 0) return@collect
+            if (produced <= 0) return AudioFrame(level, null)
 
             // Slide the window left by one hop, then append the new samples.
             val shift = minOf(produced, window.size)
@@ -119,15 +117,12 @@ class PitchEngine(
             System.arraycopy(decimated, 0, window, window.size - shift, shift)
             if (filled < window.size) {
                 filled += shift
-                if (filled < window.size) {
-                    emit(AudioFrame(level, null))
-                    return@collect
-                }
+                if (filled < window.size) return AudioFrame(level, null)
             }
 
-            emit(AudioFrame(level, state.accept(detector.detect(window), level)))
+            return AudioFrame(level, state.accept(detector.detect(window), level))
         }
-    }.flowOn(Dispatchers.Default)
+    }
 
     private fun levelDbOf(block: FloatArray): Float {
         var energy = 0.0
@@ -152,6 +147,28 @@ class PitchEngine(
             return result
         }
     }
+}
+
+/**
+ * Capture, band limiting, detection and outlier rejection, as one flow of frames: the
+ * [PitchPipeline] fed from the microphone.
+ */
+class PitchEngine(
+    private val capture: AudioCaptureSource,
+    detectorFactory: (Int) -> PitchDetector = { rate -> McLeodPitchDetector(sampleRate = rate) },
+) {
+
+    private val pipeline = PitchPipeline(capture.sampleRate, capture.hopSize, detectorFactory)
+
+    fun availableSources(): List<MicSource> = capture.availableSources()
+
+    fun configureFor(tuning: Tuning) = pipeline.configureFor(tuning)
+
+    @RequiresPermission(Manifest.permission.RECORD_AUDIO)
+    fun frames(source: MicSource): Flow<AudioFrame> = flow {
+        val session = pipeline.session()
+        capture.hops(source).collect { block -> emit(session.accept(block)) }
+    }.flowOn(Dispatchers.Default)
 }
 
 /** Fixed size running median. Cheap at n=5; do not grow this without switching to a heap. */

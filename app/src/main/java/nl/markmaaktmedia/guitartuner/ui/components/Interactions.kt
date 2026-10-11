@@ -1,7 +1,8 @@
 package nl.markmaaktmedia.guitartuner.ui.components
 
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.material3.ripple
@@ -27,12 +28,15 @@ import nl.markmaaktmedia.guitartuner.ui.theme.TunerMotion
  * The ripple stays. It is what tells you where the touch landed, and losing it for the
  * sake of the scale would trade information for polish.
  */
+@OptIn(ExperimentalFoundationApi::class)
 fun Modifier.bouncyClickable(
     enabled: Boolean = true,
     pressedScale: Float = TunerMotion.PressedScale,
     withHaptics: Boolean = false,
     role: Role? = Role.Button,
     onClickLabel: String? = null,
+    /** Something that happens on a long press, with a buzz. */
+    onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit,
 ): Modifier = composed {
     val interactionSource = remember { MutableInteractionSource() }
@@ -48,14 +52,21 @@ fun Modifier.bouncyClickable(
     graphicsLayer {
         scaleX = scale
         scaleY = scale
-    }.clickable(
+    }.combinedClickable(
         interactionSource = interactionSource,
         indication = ripple(),
         enabled = enabled,
         role = role,
         onClickLabel = onClickLabel,
-    ) {
-        if (withHaptics) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-        onClick()
-    }
+        onLongClick = onLongClick?.let { long ->
+            {
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                long()
+            }
+        },
+        onClick = {
+            if (withHaptics) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            onClick()
+        },
+    )
 }

@@ -6,11 +6,36 @@ Compose with a Material 3 Expressive interface that takes its colours from your 
 No ads, no accounts, no network access except one call to the GitHub Releases API to tell you
 when a new build is out. Audio never leaves the device.
 
+## Screenshots
+
+<p>
+  <img src="docs/screenshot-dark.png" width="240" alt="The tuner in dark mode">
+  <img src="docs/screenshot-light.png" width="240" alt="The tuner in light mode">
+  <img src="docs/screenshot-settings.png" width="240" alt="Settings">
+</p>
+
 ## Status
 
 Working end to end: band limited audio capture, pitch detection with octave locking, string
-matching, auto advance, the tuning dial, per instrument headstocks, reference tones, signed
-releases and in app update notification.
+matching, auto advance, the line tuner, a wooden head with a bubble per string for eleven
+instruments, reference tones, signed releases and in app updates.
+
+## Using it
+
+A bubble hangs from a line and slides sideways with the pitch: left of the line is flat, right is
+sharp, and a tick appears when the string is right. The trail behind it shows where the pitch just
+was. The tuner starts in auto: play a string and it finds which one. Tap a string to lock to it,
+tap it again to go back to auto, hold it to hear the note. Tap the note under the line to hear it,
+and tap it again when every string is done to start over.
+
+## Design
+
+The look is shared with Tandem and Rushes: Google Sans Flex, Material Symbols Rounded, grouped
+settings slabs, springs for movement and tweens for colour, and an icon on the same indigo plate
+(`scripts/make-icon.swift` draws it). Settings follow Tandem: categories that open pages, a
+colours page that previews every accent and palette style as a small tuner, light, dark and pure
+black, and English or Dutch. The head and its tuners are wood and chrome on purpose and do not
+follow the palette.
 
 ## Install
 

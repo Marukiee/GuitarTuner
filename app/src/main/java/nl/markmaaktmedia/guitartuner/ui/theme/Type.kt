@@ -83,18 +83,17 @@ val TunerTypography = Typography(
 )
 
 /**
- * The note letter on the dial.
+ * The note letter in the circle at the foot of the line.
  *
- * Off the Material scale because nothing on that scale is big enough: this is the one
- * piece of text in the app that has to be legible from a metre away, on a guitar stand,
- * at a glance. Tracking is pulled in hard because two or three large glyphs at default
- * tracking drift apart.
+ * Off the Material scale because nothing on that scale is the right size: it has to be
+ * legible from a metre away, on a guitar stand, at a glance. Tracking is pulled in because
+ * two large glyphs at default tracking drift apart.
  */
-val NoteDisplayStyle = TextStyle(
+val NoteBubbleStyle = TextStyle(
     fontFamily = GoogleSansRounded,
     fontWeight = FontWeight.Bold,
-    fontSize = 96.sp,
-    lineHeight = 100.sp,
-    letterSpacing = (-3).sp,
+    fontSize = 30.sp,
+    lineHeight = 34.sp,
+    letterSpacing = (-0.5).sp,
     platformStyle = noPadding,
 )

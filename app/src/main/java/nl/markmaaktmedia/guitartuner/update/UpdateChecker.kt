@@ -8,6 +8,7 @@ import android.os.Build
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import nl.markmaaktmedia.guitartuner.R
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.SocketTimeoutException
@@ -81,7 +82,7 @@ class UpdateChecker(private val context: Context) {
             val current = currentVersionCode
             lastError = null
             val latest = fetchLatest(fresh)
-                ?: return@withContext UpdateStatus(current, null, false, lastError ?: "No release found")
+                ?: return@withContext UpdateStatus(current, null, false, lastError ?: context.getString(R.string.update_err_none))
 
             val dismissed = prefs.getLong(KEY_DISMISSED, -1L)
             val isNewer = latest.versionCode > current &&
@@ -116,7 +117,7 @@ class UpdateChecker(private val context: Context) {
         if (body != null) {
             val release = ReleaseParser.parse(body)
             if (release == null) {
-                lastError = "Latest release has no APK asset, or its tag is not a build number"
+                lastError = context.getString(R.string.update_err_no_apk)
                 return null
             }
             prefs.edit()
@@ -145,7 +146,7 @@ class UpdateChecker(private val context: Context) {
         try {
             if (connection.responseCode != HttpURLConnection.HTTP_OK) {
                 // 403 here is almost always the anonymous rate limit, 60 per hour per IP.
-                lastError = "GitHub returned HTTP ${connection.responseCode}"
+                lastError = context.getString(R.string.update_err_http, connection.responseCode)
                 Log.i(TAG, "Release check returned HTTP ${connection.responseCode}")
                 return@runCatching null
             }
@@ -211,22 +212,17 @@ class UpdateChecker(private val context: Context) {
      */
     private fun describe(error: Throwable): String = when (error) {
         is UnknownHostException ->
-            if (isOnline()) {
-                // A network is up and validated and the name still would not resolve, so
-                // something is intercepting the lookup: Private DNS pointed somewhere
-                // unreachable, a VPN or firewall app, or a blocking resolver upstream.
-                "The phone is online but could not look up github.com. Check Private DNS, " +
-                    "a VPN, or an ad blocker."
-            } else {
-                // Either there is genuinely no network, or this app has been denied it.
-                // Android reports those identically, so both get named.
-                "No network reached this app. If the phone is online, allow network access " +
-                    "for Guitar Tuner in Android settings (Apps, Guitar Tuner, Mobile data " +
-                    "and Wi-Fi), and check any firewall or VPN app."
-            }
+            // A network is up and validated and the name still would not resolve, so something
+            // is intercepting the lookup. Otherwise either there is no network or this app has
+            // been denied it, which Android reports identically, so both get named.
+            context.getString(if (isOnline()) R.string.update_err_dns else R.string.update_err_offline)
 
-        is SocketTimeoutException -> "GitHub did not answer in time. Try again."
-        else -> error::class.java.simpleName + ": " + (error.message ?: "no detail")
+        is SocketTimeoutException -> context.getString(R.string.update_err_timeout)
+        else -> context.getString(
+            R.string.update_err_other,
+            error::class.java.simpleName,
+            error.message ?: context.getString(R.string.update_err_no_detail),
+        )
     }
 
     /**
