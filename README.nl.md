@@ -11,9 +11,10 @@
 ## Screenshots
 
 <p>
-  <img src="docs/screenshot-dark.png" width="240" alt="De stemmer in donkere modus">
-  <img src="docs/screenshot-light.png" width="240" alt="De stemmer in lichte modus">
-  <img src="docs/screenshot-settings.png" width="240" alt="Instellingen">
+  <img src="docs/screenshots/tuner-dark.png" width="200" alt="De stemmer in donkere modus">
+  <img src="docs/screenshots/tuner-light.png" width="200" alt="De stemmer in lichte modus">
+  <img src="docs/screenshots/instruments.png" width="200" alt="Een viool met pegbox">
+  <img src="docs/screenshots/settings.png" width="200" alt="De kleurenpagina">
 </p>
 
 ## Wat het doet

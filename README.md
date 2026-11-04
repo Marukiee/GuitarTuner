@@ -13,9 +13,10 @@ No ads, no accounts. The only network call is one check of the GitHub releases t
 ## Screenshots
 
 <p>
-  <img src="docs/screenshot-dark.png" width="240" alt="The tuner in dark mode">
-  <img src="docs/screenshot-light.png" width="240" alt="The tuner in light mode">
-  <img src="docs/screenshot-settings.png" width="240" alt="Settings">
+  <img src="docs/screenshots/tuner-dark.png" width="200" alt="The tuner in dark mode">
+  <img src="docs/screenshots/tuner-light.png" width="200" alt="The tuner in light mode">
+  <img src="docs/screenshots/instruments.png" width="200" alt="A violin with its pegbox">
+  <img src="docs/screenshots/settings.png" width="200" alt="The colours page">
 </p>
 
 ## What it does
