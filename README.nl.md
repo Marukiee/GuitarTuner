@@ -8,15 +8,6 @@
 
 **Een open source chromatische stemmer voor Android met een houten gitaarkop.** De kleuren volgen je achtergrond, hij stemt elf instrumenten en luistert naar je snaren zonder iets naar buiten te sturen. Geen reclame, geen account. De enige netwerkaanroep is een controle van de GitHub-releases, om te laten weten dat er een nieuwe versie is.
 
-## Screenshots
-
-<p>
-  <img src="docs/screenshots/tuner-dark.png" width="200" alt="De stemmer in donkere modus">
-  <img src="docs/screenshots/tuner-light.png" width="200" alt="De stemmer in lichte modus">
-  <img src="docs/screenshots/instruments.png" width="200" alt="Een viool met pegbox">
-  <img src="docs/screenshots/settings.png" width="200" alt="De kleurenpagina">
-</p>
-
 ## Wat het doet
 
 - **Een lijn en een bel.** De bel schuift langs de lijn mee met de toonhoogte: links is te laag, rechts te hoog, en er verschijnt een streepje als de snaar klopt. Het spoor erachter laat zien waar de toon net was

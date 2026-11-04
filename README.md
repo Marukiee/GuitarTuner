@@ -10,15 +10,6 @@ English | [Nederlands](README.nl.md)
 colours, tunes eleven instruments, and listens to your strings without sending anything anywhere.
 No ads, no accounts. The only network call is one check of the GitHub releases to tell you when a new build is out.
 
-## Screenshots
-
-<p>
-  <img src="docs/screenshots/tuner-dark.png" width="200" alt="The tuner in dark mode">
-  <img src="docs/screenshots/tuner-light.png" width="200" alt="The tuner in light mode">
-  <img src="docs/screenshots/instruments.png" width="200" alt="A violin with its pegbox">
-  <img src="docs/screenshots/settings.png" width="200" alt="The colours page">
-</p>
-
 ## What it does
 
 - **A line and a bubble.** The bubble slides along the line with the pitch: left is flat, right is sharp, and a tick appears when the string is right. A trail behind it shows where the pitch just was
