@@ -125,7 +125,7 @@
     <string name="changelog_better">Better</string>
     <string name="changelog_fixed">Fixed</string>
     <string name="licence">Licence</string>
-    <string name="licence_value">MIT</string>
+    <string name="licence_value">AGPL-3.0</string>
     <string name="source_code">Source code</string>
     <string name="source_code_sub">On GitHub</string>
     <string name="section_privacy">Privacy</string>
