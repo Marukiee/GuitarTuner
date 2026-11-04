@@ -125,7 +125,7 @@
     <string name="changelog_better">Beter</string>
     <string name="changelog_fixed">Opgelost</string>
     <string name="licence">Licentie</string>
-    <string name="licence_value">MIT</string>
+    <string name="licence_value">AGPL-3.0</string>
     <string name="source_code">Broncode</string>
     <string name="source_code_sub">Op GitHub</string>
     <string name="section_privacy">Privacy</string>
