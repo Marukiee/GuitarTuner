@@ -24,6 +24,7 @@ import nl.markmaaktmedia.guitartuner.ui.nav.Route
 import nl.markmaaktmedia.guitartuner.ui.theme.TunerIcons
 import nl.markmaaktmedia.guitartuner.update.DownloadState
 import nl.markmaaktmedia.guitartuner.update.UpdateController
+import nl.markmaaktmedia.guitartuner.update.failureText
 
 /**
  * Makes the update check observable.
@@ -66,16 +67,16 @@ internal fun UpdatesPage(
                 ActionRow(
                     0, 1, TunerIcons.Download,
                     stringResource(R.string.update_install_build, newer.versionCode),
-                    when {
-                        download is DownloadState.Downloading ->
+                    when (download) {
+                        is DownloadState.Downloading ->
                             if (download.progress >= 0f) stringResource(R.string.update_downloading_percent, (download.progress * 100).toInt())
                             else stringResource(R.string.update_downloading)
-                        download is DownloadState.Failed -> stringResource(R.string.update_download_failed_detail, download.message)
-                        controller.needsInstallPermission -> stringResource(R.string.update_allow_installs)
-                        else -> newer.notes
+                        DownloadState.Installing -> stringResource(R.string.update_card_installing_button)
+                        is DownloadState.Failed -> failureText(download)
+                        DownloadState.Idle -> newer.notes
                     },
                     onClick = { controller.install(newer) },
-                    trailing = if (download is DownloadState.Downloading) {
+                    trailing = if (download is DownloadState.Downloading || download == DownloadState.Installing) {
                         { PickSpinner(size = 24.dp) }
                     } else null,
                 )
@@ -96,7 +97,11 @@ internal fun UpdatesPage(
             )
             SwitchRow(
                 2, 3, TunerIcons.Download, stringResource(R.string.preview_banner), stringResource(R.string.preview_banner_sub),
-                checked = state.bannerPreview, onChange = viewModel::setBannerPreview,
+                checked = state.bannerPreview,
+                onChange = { on ->
+                    viewModel.setBannerPreview(on)
+                    if (on) controller.startPreview() else controller.stopPreview()
+                },
             )
         }
     }

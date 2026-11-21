@@ -49,6 +49,8 @@ import nl.markmaaktmedia.guitartuner.ui.theme.connectedShape
 fun TunerScreen(
     viewModel: TunerViewModel,
     onOpenSettings: () -> Unit,
+    /** The update card, when there is one. It pushes the tuner down instead of floating over it. */
+    updateCard: @Composable () -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var showPicker by rememberSaveable { mutableStateOf(false) }
@@ -60,6 +62,8 @@ fun TunerScreen(
             .navigationBarsPadding()
             .padding(horizontal = 16.dp),
     ) {
+        updateCard()
+
         TopBar(
             state = state,
             onPickInstrument = { showPicker = true },

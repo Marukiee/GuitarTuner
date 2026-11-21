@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Debug builds only: lets the update card be tried against a build served from this
+         computer (`adb reverse`), which is plain http. Release builds do not have this. -->
+    <application android:networkSecurityConfig="@xml/debug_network_security" />
+
+</manifest>

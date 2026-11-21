@@ -21,7 +21,14 @@ data class AppRelease(
     val name: String,
     val notes: String?,
     val apkUrl: String,
-)
+    /** The size of the APK in bytes, when the release says; 0 when it does not (the redirect route). */
+    val sizeBytes: Long = 0L,
+    /** Up to two short lines from the release notes, for the update card. Empty when there are none. */
+    val highlights: List<String> = emptyList(),
+) {
+    /** The version name this build has: the workflow sets versionName to `1.0.<run number>`. */
+    val versionName: String get() = "1.0.$versionCode"
+}
 
 data class UpdateStatus(
     val currentVersionCode: Long,
@@ -281,11 +288,13 @@ internal fun parse(json: String): AppRelease? = runCatching {
 
     val assets = root.optJSONArray("assets") ?: return null
     var apkUrl: String? = null
+    var sizeBytes = 0L
     for (i in 0 until assets.length()) {
         val asset = assets.getJSONObject(i)
         val url = asset.optString("browser_download_url")
         if (url.endsWith(".apk", ignoreCase = true)) {
             apkUrl = url
+            sizeBytes = asset.optLong("size", 0L)
             break
         }
     }
@@ -295,6 +304,8 @@ internal fun parse(json: String): AppRelease? = runCatching {
         name = root.optString("name").ifBlank { "Build $versionCode" },
         notes = root.optString("body").takeIf { it.isNotBlank() }?.lineSequence()?.first()?.trim(),
         apkUrl = apkUrl ?: return null,
+        sizeBytes = sizeBytes,
+        highlights = ReleaseNotes.highlights(root.optString("body")),
     )
 }.getOrNull()
 

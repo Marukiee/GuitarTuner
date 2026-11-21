@@ -53,6 +53,7 @@ import nl.markmaaktmedia.guitartuner.ui.settings.UpdatesPage
 import nl.markmaaktmedia.guitartuner.ui.theme.CardSquircle
 import nl.markmaaktmedia.guitartuner.ui.theme.TunerIcons
 import nl.markmaaktmedia.guitartuner.ui.tuner.TunerScreen
+import nl.markmaaktmedia.guitartuner.update.UpdateCard
 import nl.markmaaktmedia.guitartuner.update.UpdateController
 
 /**
@@ -62,7 +63,7 @@ import nl.markmaaktmedia.guitartuner.update.UpdateController
  * reference pitch takes effect immediately and can be checked by playing a string.
  */
 @Composable
-fun AppRoot(viewModel: TunerViewModel, updates: UpdateController) {
+fun AppRoot(viewModel: TunerViewModel, updates: UpdateController, showUpdateCard: Boolean = true) {
     val context = LocalContext.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val navigator = rememberNavigator()
@@ -105,6 +106,13 @@ fun AppRoot(viewModel: TunerViewModel, updates: UpdateController) {
         onPauseOrDispose { viewModel.stopListening() }
     }
 
+    // A release published while the app was open should still surface, so ask again on every
+    // resume and not only once. The card itself is further down, on the tuner.
+    LifecycleResumeEffect(showUpdateCard) {
+        if (showUpdateCard) updates.checkOnOpen()
+        onPauseOrDispose { }
+    }
+
     // Capture only runs while the screen is actually resumed and permitted.
     LaunchedEffect(state.micPermission) {
         if (state.micPermission == MicPermissionState.Granted) {
@@ -136,7 +144,11 @@ fun AppRoot(viewModel: TunerViewModel, updates: UpdateController) {
         navigator = navigator,
         root = {
             if (state.micPermission == MicPermissionState.Granted) {
-                TunerScreen(viewModel, onOpenSettings = { navigator.push(Route.Settings) })
+                TunerScreen(
+                    viewModel,
+                    onOpenSettings = { navigator.push(Route.Settings) },
+                    updateCard = { if (showUpdateCard) UpdateCard(updates) },
+                )
             } else {
                 PermissionGate(
                     permanentlyDenied = state.micPermission == MicPermissionState.PermanentlyDenied,

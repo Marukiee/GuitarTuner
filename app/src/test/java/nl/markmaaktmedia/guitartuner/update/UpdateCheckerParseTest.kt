@@ -34,6 +34,28 @@ class UpdateCheckerParseTest {
         assertEquals("feat: rounded font, green in-tune feedback, instrument picker", release.notes)
     }
 
+    @Test
+    fun `reads the size of the apk and a title line for the update card`() {
+        val release = ReleaseParser.parse(payload())!!
+
+        assertEquals(1_389_506L, release.sizeBytes)
+        assertEquals(listOf("Rounded font, green in-tune feedback, instrument picker"), release.highlights)
+        assertEquals("1.0.10", release.versionName)
+    }
+
+    @Test
+    fun `takes two bullet lines from a release body for the update card`() {
+        val body = "feat: an update card\n\n- It downloads\n- It installs by itself\n- A third one\n"
+        val release = ReleaseParser.parse(mutated { put("body", body) })!!
+
+        assertEquals(listOf("It downloads", "It installs by itself"), release.highlights)
+    }
+
+    @Test
+    fun `the redirect route has no lines for the update card`() {
+        assertEquals(emptyList<String>(), redirect("$RELEASES_BASE/tag/v16")!!.highlights)
+    }
+
     /**
      * Mutations go through JSONObject rather than string replacement. The first version of these
      * tests edited the raw text and silently matched nothing, because the API returns compact

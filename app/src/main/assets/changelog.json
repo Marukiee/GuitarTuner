@@ -1,5 +1,29 @@
 [
   {
+    "version": "1.0.24",
+    "date": "2026-11-21",
+    "en": {
+      "title": "A new update card",
+      "new": [
+        "An update card at the top of the tuner: press Update, watch the bar fill, and the new version installs by itself",
+        "If an update does not work the card says why, with one button to try again"
+      ],
+      "better": [
+        "Later hides a version until a newer one comes out"
+      ]
+    },
+    "nl": {
+      "title": "Een nieuwe updatekaart",
+      "new": [
+        "Een updatekaart bovenaan de tuner: tik op Bijwerken, zie de balk vollopen en de nieuwe versie installeert vanzelf",
+        "Lukt een update niet, dan zegt de kaart waarom, met één knop om het opnieuw te proberen"
+      ],
+      "better": [
+        "Later verbergt een versie tot er een nieuwere uitkomt"
+      ]
+    }
+  },
+  {
     "version": "1.0.19",
     "date": "2026-10-12",
     "en": {
