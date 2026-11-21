@@ -72,16 +72,18 @@ jobs:
           path: app/build/outputs/apk/**/*.apk
           retention-days: 30
 
-      # Stable asset name so the in-app update banner always has a direct download URL:
+      # Stable asset name so the in-app update card always has a direct download URL:
       #   https://github.com/Marukiee/GuitarTuner/releases/latest/download/guitartuner.apk
       - name: Stage APK for release
         if: steps.keystore.outputs.signed == 'true' && github.ref == 'refs/heads/main'
         run: |
           APK=$(find app/build/outputs/apk -name '*-release.apk' | head -1)
           cp "$APK" "$RUNNER_TEMP/guitartuner.apk"
+          # markupdate checks the download against this file; it is optional there, but cheap to give.
+          (cd "$RUNNER_TEMP" && sha256sum guitartuner.apk > guitartuner.apk.sha256)
 
-      # The tag is v<run_number> and versionCode is the same run number. UpdateChecker strips
-      # the "v" and compares the two as integers, so these must stay in lockstep.
+      # The tag is v<run_number> and versionCode is the same run number. markupdate gets
+      # versionCode as its current version (see GuitarTunerApp), so these must stay in lockstep.
       - name: Publish GitHub Release
         if: steps.keystore.outputs.signed == 'true' && github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
@@ -90,4 +92,6 @@ jobs:
           name: Build ${{ github.run_number }}
           body: ${{ github.event.head_commit.message }}
           make_latest: true
-          files: ${{ runner.temp }}/guitartuner.apk
+          files: |
+            ${{ runner.temp }}/guitartuner.apk
+            ${{ runner.temp }}/guitartuner.apk.sha256

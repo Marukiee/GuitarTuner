@@ -1,5 +1,21 @@
 [
   {
+    "version": "1.0.25",
+    "date": "2026-11-21",
+    "en": {
+      "title": "The shared update card",
+      "better": [
+        "The update card is now the same one as in my other apps, with the same look and the same way of downloading and installing"
+      ]
+    },
+    "nl": {
+      "title": "De gedeelde updatekaart",
+      "better": [
+        "De updatekaart is nu dezelfde als in mijn andere apps, met dezelfde look en dezelfde manier van downloaden en installeren"
+      ]
+    }
+  },
+  {
     "version": "1.0.24",
     "date": "2026-11-21",
     "en": {

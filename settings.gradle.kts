@@ -22,3 +22,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "GuitarTuner"
 include(":app")
+include(":markupdate:core", ":markupdate:card")

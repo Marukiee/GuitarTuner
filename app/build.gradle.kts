@@ -113,6 +113,8 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.activity.compose)
     implementation(libs.kotlinx.coroutines.android)
+    // The updater and its card, the same code in every app (see markupdate/README.md).
+    implementation(project(":markupdate:card"))
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
@@ -125,10 +127,6 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 
     testImplementation(libs.junit)
-    // The real org.json, so parsing is actually exercised in unit tests instead of hitting the
-    // stubbed framework classes that return defaults.
-    testImplementation(libs.json)
-    testImplementation(libs.kotlinx.coroutines.test)
 
     androidTestImplementation(libs.androidx.test.junit)
     androidTestImplementation(libs.androidx.espresso.core)

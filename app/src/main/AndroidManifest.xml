@@ -3,17 +3,9 @@
 
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.VIBRATE" />
-    <!-- Only ever used to ask the GitHub Releases API whether a newer APK exists.
-         No audio, and nothing else, ever leaves the device. Without this the update
-         check throws a SecurityException that the checker swallows, so the banner
-         silently never appears. -->
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <!-- So an update can be handed to the system installer from inside the app. -->
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-    <!-- With the above, Android 12 and later replace the app without asking again, once an
-         earlier update has been installed through the app itself. -->
-    <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
+    <!-- Internet, installing an update, and the update notification come with the markupdate
+         module through the manifest merge. Only the update check and the download use the
+         network: no audio, and nothing else, ever leaves the device. -->
 
     <uses-feature
         android:name="android.hardware.microphone"
@@ -25,6 +17,7 @@
          PredictiveBackHandler collapses to a plain back press and the Settings page jumps
          shut instead of following the thumb. -->
     <application
+        android:name=".GuitarTunerApp"
         android:allowBackup="true"
         android:enableOnBackInvokedCallback="true"
         android:icon="@mipmap/ic_launcher"
@@ -45,12 +38,6 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
-        <!-- Where the system installer reports on an update that was handed to it. Not exported:
-             the system fills in the PendingIntent that points here. -->
-        <receiver
-            android:name=".update.InstallStatusReceiver"
-            android:exported="false" />
 
         <!-- Keeps the per-app language across restarts on Android 12 and older. -->
         <service

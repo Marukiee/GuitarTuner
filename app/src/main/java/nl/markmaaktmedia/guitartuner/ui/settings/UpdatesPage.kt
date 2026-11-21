@@ -2,12 +2,12 @@ package nl.markmaaktmedia.guitartuner.ui.settings
 
 import android.content.Intent
 import android.net.Uri
-import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import nl.markmaaktmedia.guitartuner.BuildConfig
@@ -15,37 +15,39 @@ import nl.markmaaktmedia.guitartuner.R
 import nl.markmaaktmedia.guitartuner.ui.TunerViewModel
 import nl.markmaaktmedia.guitartuner.ui.components.ActionRow
 import nl.markmaaktmedia.guitartuner.ui.components.InfoRow
-import nl.markmaaktmedia.guitartuner.ui.components.NoteRow
 import nl.markmaaktmedia.guitartuner.ui.components.PickSpinner
 import nl.markmaaktmedia.guitartuner.ui.components.SectionHeader
 import nl.markmaaktmedia.guitartuner.ui.components.SettingsGroup
 import nl.markmaaktmedia.guitartuner.ui.components.SwitchRow
 import nl.markmaaktmedia.guitartuner.ui.nav.Route
 import nl.markmaaktmedia.guitartuner.ui.theme.TunerIcons
-import nl.markmaaktmedia.guitartuner.update.DownloadState
-import nl.markmaaktmedia.guitartuner.update.UpdateController
-import nl.markmaaktmedia.guitartuner.update.failureText
+import nl.markmaaktmedia.markupdate.MarkUpdate
+import nl.markmaaktmedia.markupdate.ReleaseInfo
+import nl.markmaaktmedia.markupdate.UpdateState
 
 /**
  * Makes the update check observable.
  *
- * "I get no banner" has at least four causes that look identical from outside the app: already
- * on the latest build, no network, GitHub's anonymous rate limit, or a release with no APK
- * attached. So this page states the installed build, asks GitHub on demand, and prints whatever
- * came back, including the failure. It also offers a way out: the releases page in the browser,
- * which is a different app with different permissions and often just works.
+ * "I get no card" has at least four causes that look identical from outside the app: already on
+ * the latest build, no network, GitHub's anonymous rate limit, or a release with no APK attached.
+ * So this page states the installed build, asks GitHub on demand, and prints whatever came back,
+ * including the failure. It also offers a way out: the releases page in the browser, which is a
+ * different app with different permissions and often just works.
+ *
+ * The check, the download and the install are the shared markupdate module's; the card on the
+ * tuner shows the same state this page does.
  */
 @Composable
 internal fun UpdatesPage(
-    controller: UpdateController,
     viewModel: TunerViewModel,
     onBack: () -> Unit,
     onOpen: (Route) -> Unit,
 ) {
     val context = LocalContext.current
+    val updater = MarkUpdate.get()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val newer = controller.release
-    val download = controller.download
+    val update by updater.state.collectAsStateWithLifecycle()
+    val release = releaseOf(update)
 
     PageFrame(stringResource(R.string.settings_updates), onBack) {
         SectionHeader(stringResource(R.string.section_version))
@@ -53,30 +55,36 @@ internal fun UpdatesPage(
             InfoRow(0, 2, TunerIcons.Info, stringResource(R.string.installed_version), BuildConfig.VERSION_NAME)
             ActionRow(
                 1, 2, TunerIcons.Refresh, stringResource(R.string.check_updates),
-                controller.message ?: stringResource(R.string.check_updates_sub),
-                onClick = controller::checkNow,
-                trailing = if (controller.checking) {
+                when (val s = update) {
+                    UpdateState.UpToDate -> stringResource(R.string.update_up_to_date)
+                    is UpdateState.Failed -> stringResource(R.string.update_check_failed, s.reason)
+                    is UpdateState.Available -> stringResource(R.string.update_available_build, s.release.versionName)
+                    else -> stringResource(R.string.check_updates_sub)
+                },
+                onClick = { updater.checkAsync() },
+                trailing = if (update is UpdateState.Checking) {
                     { PickSpinner(size = 24.dp) }
                 } else null,
             )
         }
 
-        if (newer != null) {
+        if (release != null) {
             SectionHeader(stringResource(R.string.section_available))
             SettingsGroup {
                 ActionRow(
                     0, 1, TunerIcons.Download,
-                    stringResource(R.string.update_install_build, newer.versionCode),
-                    when (download) {
-                        is DownloadState.Downloading ->
-                            if (download.progress >= 0f) stringResource(R.string.update_downloading_percent, (download.progress * 100).toInt())
-                            else stringResource(R.string.update_downloading)
-                        DownloadState.Installing -> stringResource(R.string.update_card_installing_button)
-                        is DownloadState.Failed -> failureText(download)
-                        DownloadState.Idle -> newer.notes
+                    stringResource(R.string.update_install_build, release.versionName),
+                    when (val s = update) {
+                        is UpdateState.Downloading ->
+                            stringResource(R.string.update_downloading_percent, (s.progress * 100).toInt())
+                        is UpdateState.ReadyToInstall, is UpdateState.Installing, is UpdateState.AwaitingConfirmation ->
+                            stringResource(R.string.update_installing)
+                        is UpdateState.NeedsPermission -> stringResource(R.string.update_allow_installs)
+                        is UpdateState.Failed -> s.reason
+                        else -> null
                     },
-                    onClick = { controller.install(newer) },
-                    trailing = if (download is DownloadState.Downloading || download == DownloadState.Installing) {
+                    onClick = { updater.startUpdate(release) },
+                    trailing = if (update is UpdateState.Downloading || update is UpdateState.Installing) {
                         { PickSpinner(size = 24.dp) }
                     } else null,
                 )
@@ -92,7 +100,7 @@ internal fun UpdatesPage(
             ActionRow(
                 1, 3, TunerIcons.OpenInNew, stringResource(R.string.open_releases), stringResource(R.string.open_releases_sub),
                 onClick = {
-                    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(ReleasesPage))) }
+                    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(updater.releasesPageUrl + "/latest"))) }
                 },
             )
             SwitchRow(
@@ -100,12 +108,21 @@ internal fun UpdatesPage(
                 checked = state.bannerPreview,
                 onChange = { on ->
                     viewModel.setBannerPreview(on)
-                    if (on) controller.startPreview() else controller.stopPreview()
+                    if (on) updater.showPreview() else updater.reset()
                 },
             )
         }
     }
 }
 
-/** The human facing page, not the API endpoint the checker uses. */
-private const val ReleasesPage = "https://github.com/Marukiee/GuitarTuner/releases/latest"
+/** The release an update is about, whatever stage it is in; null when there is none or it is not about a release. */
+private fun releaseOf(state: UpdateState): ReleaseInfo? = when (state) {
+    is UpdateState.Available -> state.release
+    is UpdateState.Downloading -> state.release
+    is UpdateState.ReadyToInstall -> state.release
+    is UpdateState.NeedsPermission -> state.release
+    is UpdateState.Installing -> state.release
+    is UpdateState.AwaitingConfirmation -> state.release
+    is UpdateState.Failed -> state.release
+    else -> null
+}

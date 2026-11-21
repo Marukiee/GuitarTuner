@@ -16,3 +16,6 @@ keystore.properties
 *.jks
 *.keystore
 !app/debug.keystore
+
+# The shared updater module is copied in from Keeper; its build output is not ours.
+markupdate/*/build/

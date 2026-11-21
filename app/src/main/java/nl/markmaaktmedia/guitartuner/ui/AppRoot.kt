@@ -51,10 +51,12 @@ import nl.markmaaktmedia.guitartuner.ui.settings.SettingsScreen
 import nl.markmaaktmedia.guitartuner.ui.settings.TunerSettingsPage
 import nl.markmaaktmedia.guitartuner.ui.settings.UpdatesPage
 import nl.markmaaktmedia.guitartuner.ui.theme.CardSquircle
+import nl.markmaaktmedia.guitartuner.ui.theme.LocalTunerSignals
 import nl.markmaaktmedia.guitartuner.ui.theme.TunerIcons
 import nl.markmaaktmedia.guitartuner.ui.tuner.TunerScreen
-import nl.markmaaktmedia.guitartuner.update.UpdateCard
-import nl.markmaaktmedia.guitartuner.update.UpdateController
+import nl.markmaaktmedia.markupdate.MarkUpdate
+import nl.markmaaktmedia.markupdate.ui.UpdateCard
+import nl.markmaaktmedia.markupdate.ui.UpdateCardStyle
 
 /**
  * The tuner, and the pages over it.
@@ -63,7 +65,11 @@ import nl.markmaaktmedia.guitartuner.update.UpdateController
  * reference pitch takes effect immediately and can be checked by playing a string.
  */
 @Composable
-fun AppRoot(viewModel: TunerViewModel, updates: UpdateController, showUpdateCard: Boolean = true) {
+fun AppRoot(
+    viewModel: TunerViewModel,
+    showUpdateCard: Boolean = true,
+    checkForUpdates: Boolean = showUpdateCard,
+) {
     val context = LocalContext.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val navigator = rememberNavigator()
@@ -106,11 +112,10 @@ fun AppRoot(viewModel: TunerViewModel, updates: UpdateController, showUpdateCard
         onPauseOrDispose { viewModel.stopListening() }
     }
 
-    // A release published while the app was open should still surface, so ask again on every
-    // resume and not only once. The card itself is further down, on the tuner.
-    LifecycleResumeEffect(showUpdateCard) {
-        if (showUpdateCard) updates.checkOnOpen()
-        onPauseOrDispose { }
+    // When the app opens the updater looks for a newer release (at most every few hours). The
+    // card itself is further down, on the tuner.
+    LaunchedEffect(checkForUpdates) {
+        if (checkForUpdates) MarkUpdate.get().checkIfDue()
     }
 
     // Capture only runs while the screen is actually resumed and permitted.
@@ -147,7 +152,17 @@ fun AppRoot(viewModel: TunerViewModel, updates: UpdateController, showUpdateCard
                 TunerScreen(
                     viewModel,
                     onOpenSettings = { navigator.push(Route.Settings) },
-                    updateCard = { if (showUpdateCard) UpdateCard(updates) },
+                    updateCard = {
+                        if (showUpdateCard) {
+                            UpdateCard(
+                                modifier = Modifier.padding(top = 8.dp),
+                                style = UpdateCardStyle(
+                                    shape = CardSquircle,
+                                    successColor = LocalTunerSignals.current.inTune,
+                                ),
+                            )
+                        }
+                    },
                 )
             } else {
                 PermissionGate(
@@ -167,7 +182,7 @@ fun AppRoot(viewModel: TunerViewModel, updates: UpdateController, showUpdateCard
                 Route.TunerSettings -> TunerSettingsPage(viewModel, onBack = navigator::pop)
                 Route.Look -> LookPage(viewModel, onBack = navigator::pop, onOpen = navigator::push)
                 Route.Appearance -> AppearanceScreen(viewModel, onBack = navigator::pop)
-                Route.Updates -> UpdatesPage(updates, viewModel, onBack = navigator::pop, onOpen = navigator::push)
+                Route.Updates -> UpdatesPage(viewModel, onBack = navigator::pop, onOpen = navigator::push)
                 Route.Changelog -> ChangelogScreen(onBack = navigator::pop)
                 Route.About -> AboutPage(onBack = navigator::pop)
             }

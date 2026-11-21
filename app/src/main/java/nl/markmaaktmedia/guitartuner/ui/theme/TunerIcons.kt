@@ -58,7 +58,6 @@ object TunerIcons {
     val Contrast: Painter @Composable get() = painterResource(R.drawable.sym_contrast)
     val Update: Painter @Composable get() = painterResource(R.drawable.sym_system_update)
     val Download: Painter @Composable get() = painterResource(R.drawable.sym_download)
-    val Spark: Painter @Composable get() = painterResource(R.drawable.sym_auto_awesome)
     val Code: Painter @Composable get() = painterResource(R.drawable.sym_code)
     val Shield: Painter @Composable get() = painterResource(R.drawable.sym_shield)
     val Idea: Painter @Composable get() = painterResource(R.drawable.sym_lightbulb)
