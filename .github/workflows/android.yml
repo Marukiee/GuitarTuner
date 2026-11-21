@@ -80,6 +80,18 @@ jobs:
           APK=$(find app/build/outputs/apk -name '*-release.apk' | head -1)
           cp "$APK" "$RUNNER_TEMP/guitartuner.apk"
 
+      - name: Release notes
+        if: steps.keystore.outputs.signed == 'true' && github.ref == 'refs/heads/main'
+        run: |
+          {
+            echo "## $(git log -1 --format=%s | sed -E 's/^[a-z]+(\([^)]*\))?: //')"
+            echo
+            git log -1 --format=%b | grep -v '^Co-Authored-By' || true
+            echo '---'
+            echo
+            echo 'Install `guitartuner.apk` on your phone. The app tells you when a newer build exists.'
+          } > "$RUNNER_TEMP/notes.md"
+
       # The tag is v<run_number> and versionCode is the same run number. UpdateChecker strips
       # the "v" and compares the two as integers, so these must stay in lockstep.
       - name: Publish GitHub Release
@@ -87,7 +99,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ github.run_number }}
-          name: Build ${{ github.run_number }}
-          body: ${{ github.event.head_commit.message }}
+          name: GuitarTuner build ${{ github.run_number }}
+          body_path: ${{ runner.temp }}/notes.md
           make_latest: true
           files: ${{ runner.temp }}/guitartuner.apk
