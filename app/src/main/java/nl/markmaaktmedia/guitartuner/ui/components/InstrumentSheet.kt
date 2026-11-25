@@ -1,6 +1,37 @@
 package nl.markmaaktmedia.guitartuner.ui.components
 
 import androidx.compose.animation.animateColorAsState
+import android.view.ViewGroup
+import androidx.activity.compose.PredictiveBackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
+import androidx.core.view.WindowCompat
+import kotlinx.coroutines.launch
+import kotlin.coroutines.cancellation.CancellationException
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -9,6 +40,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -22,9 +54,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -45,11 +75,16 @@ import nl.markmaaktmedia.guitartuner.ui.theme.TunerMotion
 import nl.markmaaktmedia.guitartuner.ui.theme.groupedShape
 
 /**
- * Instrument and tuning, in one sheet.
+ * Instrument and tuning, in one panel that unfolds from the bar you tapped.
  *
  * They belong together because picking one nearly always means checking the other: the
  * player who switches to a bass is the same player who wants to know whether it is still
  * in drop D. Splitting them across two screens turns one decision into two navigations.
+ *
+ * It opens the way the panels of MarkMySteps do: the page dims, and the panel grows out of the
+ * top, from the bar it belongs to, instead of rising from the bottom edge. A panel that gets
+ * taller because another instrument has more tunings grows instead of jumping. The back
+ * gesture shrinks it a little and lightens the dim under the thumb, and closes it when let go.
  */
 @Composable
 fun InstrumentSheet(
@@ -59,63 +94,134 @@ fun InstrumentSheet(
     onTuning: (Tuning) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scheme = MaterialTheme.colorScheme
     val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(instrument) {
         val index = Instrument.entries.indexOf(instrument)
         if (index >= 0) listState.animateScrollToItem(index)
     }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+    val shown = remember { MutableTransitionState(false) }
+    val back = remember { Animatable(0f) }
+    LaunchedEffect(Unit) { shown.targetState = true }
+    // Once the panel has played its way out, it leaves.
+    LaunchedEffect(shown.currentState, shown.isIdle) {
+        if (shown.isIdle && !shown.currentState && !shown.targetState) onDismiss()
+    }
+    val close: () -> Unit = { shown.targetState = false }
+    val origin = TransformOrigin(0.3f, 0f)
+
+    Dialog(
+        onDismissRequest = close,
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
-        Column(
-            modifier = Modifier
-                .verticalScroll(rememberScrollState())
-                .navigationBarsPadding()
-                .padding(bottom = 20.dp),
+        // The window itself: no dim and no animation of its own, the panel does both.
+        val view = LocalView.current
+        SideEffect {
+            (view.parent as? DialogWindowProvider)?.window?.let { window ->
+                window.setDimAmount(0f)
+                window.setWindowAnimations(0)
+                window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+                WindowCompat.setDecorFitsSystemWindows(window, false)
+            }
+        }
+        PredictiveBackHandler { events ->
+            try {
+                events.collect { back.snapTo(it.progress) }
+                close()
+            } catch (cancelled: CancellationException) {
+                scope.launch { back.animateTo(0f, tween(200)) }
+            }
+        }
+        val dim by animateFloatAsState(
+            targetValue = if (shown.targetState) 0.32f else 0f,
+            animationSpec = TunerMotion.fadeSpec(),
+            label = "panelDim",
+        )
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = dim * (1f - back.value * 0.5f)))
+                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { close() },
         ) {
-            SheetHeading(stringResource(R.string.sheet_instrument))
-            LazyRow(
-                state = listState,
-                contentPadding = PaddingValues(horizontal = 20.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            AnimatedVisibility(
+                visibleState = shown,
+                // Right under the instrument bar: its status bar, its own margin and its height.
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(top = 8.dp + 58.dp + 8.dp, start = 12.dp, end = 12.dp),
+                enter = scaleIn(TunerMotion.spatial(), initialScale = 0.85f, transformOrigin = origin) +
+                    fadeIn(TunerMotion.fadeSpec()),
+                exit = scaleOut(tween(220, easing = TunerMotion.Standard), targetScale = 0.9f, transformOrigin = origin) +
+                    fadeOut(tween(160)),
             ) {
-                items(Instrument.entries, key = { it.name }) { entry ->
-                    InstrumentCard(
-                        instrument = entry,
-                        selected = entry == instrument,
-                        onClick = { onInstrument(entry) },
-                    )
-                }
-            }
+                val shape = RoundedCornerShape(32.dp)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .graphicsLayer {
+                            val k = 1f - 0.08f * back.value
+                            scaleX = k
+                            scaleY = k
+                            transformOrigin = origin
+                        }
+                        .clip(shape)
+                        .background(scheme.surfaceContainerLow)
+                        .border(1.dp, scheme.outlineVariant.copy(alpha = 0.55f), shape)
+                        // A tap on the panel is not a tap on the dim behind it.
+                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
+                        .animateContentSize(TunerMotion.spatial()),
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .heightIn(max = (LocalConfiguration.current.screenHeightDp - 190).dp)
+                            .verticalScroll(rememberScrollState())
+                            .padding(top = 20.dp, bottom = 20.dp),
+                    ) {
+                        SheetHeading(stringResource(R.string.sheet_instrument))
+                        LazyRow(
+                            state = listState,
+                            contentPadding = PaddingValues(horizontal = 20.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            items(Instrument.entries, key = { it.name }) { entry ->
+                                InstrumentCard(
+                                    instrument = entry,
+                                    selected = entry == instrument,
+                                    onClick = { onInstrument(entry) },
+                                )
+                            }
+                        }
 
-            Spacer(Modifier.height(24.dp))
-            SheetHeading(stringResource(R.string.sheet_tuning))
-            Column(
-                modifier = Modifier.padding(horizontal = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(GroupedSpacing),
-            ) {
-                instrument.tunings.forEachIndexed { index, entry ->
-                    TuningRow(
-                        tuning = entry,
-                        selected = entry.id == tuning.id,
-                        shape = groupedShape(index, instrument.tunings.size),
-                        onClick = { onTuning(entry) },
-                    )
-                }
-            }
+                        Spacer(Modifier.height(24.dp))
+                        SheetHeading(stringResource(R.string.sheet_tuning))
+                        Column(
+                            modifier = Modifier.padding(horizontal = 20.dp),
+                            verticalArrangement = Arrangement.spacedBy(GroupedSpacing),
+                        ) {
+                            instrument.tunings.forEachIndexed { index, entry ->
+                                TuningRow(
+                                    tuning = entry,
+                                    selected = entry.id == tuning.id,
+                                    shape = groupedShape(index, instrument.tunings.size),
+                                    onClick = { onTuning(entry) },
+                                )
+                            }
+                        }
 
-            if (tuning.isReentrant) {
-                Text(
-                    text = stringResource(R.string.reentrant_note),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
-                )
+                        if (tuning.isReentrant) {
+                            Text(
+                                text = stringResource(R.string.reentrant_note),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = scheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -161,17 +267,9 @@ private fun InstrumentCard(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         HeadstockView(
-            layout = instrument.layout,
+            instrument = instrument,
             stringCount = instrument.defaultTuning.stringCount,
-            scale = instrument.headstockScale,
-            // The fill is a tint of the card's own content colour rather than a light
-            // surface: on a selected card a near white silhouette swallows the outline,
-            // the tuners and the strings, and all that is left is a pale blob.
-            bodyColor = content.copy(alpha = 0.10f),
-            outlineColor = content.copy(alpha = 0.75f),
-            pegColor = if (selected) scheme.primary else content.copy(alpha = 0.85f),
-            stringColor = content.copy(alpha = 0.55f),
-            modifier = Modifier.size(width = 48.dp, height = 66.dp),
+            modifier = Modifier.size(width = 64.dp, height = 78.dp),
         )
         Text(
             text = stringResource(instrument.shortNameRes),

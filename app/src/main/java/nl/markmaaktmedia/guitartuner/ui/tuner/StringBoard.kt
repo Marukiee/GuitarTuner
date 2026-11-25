@@ -133,7 +133,6 @@ fun StringBoard(
         Canvas(Modifier.fillMaxSize()) {
             drawBoard(
                 layout = layout,
-                spec = spec,
                 wood = wood,
                 activeIndex = activeIndex,
                 tunedIndices = tunedIndices,
@@ -179,69 +178,36 @@ private fun boardLayout(layout: HeadstockLayout): HeadstockLayout =
 
 /** Where every part of the board sits, in pixels of the board. */
 private class BoardLayout(
+    val geo: HeadGeometry,
     val width: Float,
     val height: Float,
     val dp: Float,
-    /** Left edge and width of the box the head is drawn in. */
-    val headLeft: Float,
-    val headWidth: Float,
-    val pegs: List<Offset>,
-    val knobs: List<Offset>,
     val bubbles: List<Offset>,
     val bubbleDiameter: Float,
-    val nutY: Float,
-    /** Where each string crosses the nut, or for a banjo's drone, where it leaves its tuner. */
-    val slots: List<Float>,
-    val hasDrone: Boolean,
 ) {
-    fun isDrone(index: Int) = hasDrone && index == 0
+    val pegs: List<Offset> get() = geo.pegs
+    val nutY: Float get() = geo.nutY
 
-    /** The crown and the tuners are spread wide, so the knobs have room beside the head... */
-    fun headX(fraction: Float) = headLeft + ((fraction - 0.5f) * XSpread + 0.5f) * headWidth
+    /** Where each string crosses the nut, or for a banjo's drone, where it leaves its tuner. */
+    val slots: List<Float> get() = geo.slots
 
-    /** ...but the neck and the nut keep their true width, which is what makes the strings fan. */
-    fun neckX(fraction: Float) = headLeft + fraction * headWidth
-    fun headY(fraction: Float) = fraction * height
+    fun isDrone(index: Int) = geo.isDrone(index)
 
     companion object {
-        /** The head is drawn wider than its small silhouette, so the tuners have room for knobs. */
-        const val XSpread = 1.02f
-
-        /** How much wider than the nut the neck is, as a fraction of the head box. */
-        const val NeckPad = 0.03f
-
         fun of(spec: HeadSpec, count: Int, width: Float, height: Float, dp: Float): BoardLayout {
             val gutter = 4f * dp
             // Large enough to tap with a thumb, small enough that three fit down one side.
             val wanted = 50f * dp
             val headWidth = min(width - 2f * (wanted + gutter), 300f * dp).coerceAtLeast(120f * dp)
             val headLeft = (width - headWidth) / 2f
-
-            val peg = ArrayList<Offset>(count)
-            val pegSource = spec.pegs + listOfNotNull(spec.dronePeg)
-            // A banjo's drone is string zero and sits off the neck; every other string takes the
-            // peg at its own position in nut order.
-            val order = if (spec.dronePeg != null) listOf(pegSource.last()) + spec.pegs else spec.pegs
-
-            fun x(f: Float) = headLeft + ((f - 0.5f) * XSpread + 0.5f) * headWidth
-            fun y(f: Float) = f * height
-
-            order.take(count).forEach { peg += Offset(x(it.x), y(it.y)) }
-
-            // Knobs sit just outside the edge of the wood, at the height of their own tuner, on
-            // the side it is on: where the head sweeps in, the knob follows it in.
-            val centre = width / 2f
-            val crownHalf = (spec.crownRight - spec.crownLeft) / 2f * XSpread * headWidth
-            val neckHalf = (spec.nutSpread / 2f + NeckPad) * headWidth
-            val shape = headShapeFor(spec, neckHalf / crownHalf)
-            val nutTop = nutYOf(spec, height)
-            val knobs = peg.map { p ->
-                val side = if (p.x < centre) -1f else 1f
-                Offset(centre + side * (shape.edge(p.y / nutTop) * crownHalf + 17f * dp), p.y)
-            }
+            // One design dp is the density on a full size head and shrinks with it on a narrow
+            // phone, so the buttons never reach over to the bubbles.
+            val geo = HeadGeometry(spec, count, headLeft, headWidth, height, unit = headWidth / 300f)
 
             // Bubbles: one column down each side, level with their tuner, pushed apart where two
             // would touch and kept on the board.
+            val peg = geo.pegs
+            val centre = width / 2f
             val diameter = wanted
             val gap = diameter + 6f * dp
             val left = peg.indices.filter { peg[it].x < centre }.sortedBy { peg[it].y }
@@ -255,26 +221,8 @@ private class BoardLayout(
                 val px = if (peg[i].x < centre) diameter / 2f + 2f * dp else width - diameter / 2f - 2f * dp
                 Offset(px, bubbleY[i])
             }
-            val slots = (0 until peg.size).map { i ->
-                if (spec.dronePeg != null && i == 0) peg[0].x
-                else headLeft + nutSlot(if (spec.dronePeg != null) i - 1 else i, spec.pegs.size, spec) * headWidth
-            }
-            return BoardLayout(
-                width = width,
-                height = height,
-                dp = dp,
-                headLeft = headLeft,
-                headWidth = headWidth,
-                pegs = peg,
-                knobs = knobs,
-                bubbles = bubbles,
-                bubbleDiameter = diameter,
-                nutY = nutYOf(spec, height),
-                slots = slots,
-                hasDrone = spec.dronePeg != null,
-            )
+            return BoardLayout(geo, width, height, dp, bubbles, diameter)
         }
-
 
         /** Pushes sorted positions apart to at least [gap], then back inside [min]..[max]. */
         fun spread(ys: List<Float>, gap: Float, min: Float, max: Float): List<Float> {
@@ -289,204 +237,14 @@ private class BoardLayout(
     }
 }
 
-/** Where the nut sits down the board, which is also where the head ends. */
-private fun nutYOf(spec: HeadSpec, height: Float) = height * (spec.headBottom + (1f - spec.headBottom) * 0.22f)
-
-private fun headShapeFor(spec: HeadSpec, neckUnits: Float): HeadShape =
-    if (spec.scroll) HeadShape.pegbox(neckUnits) else HeadShape.arch(neckUnits)
-
 private fun DrawScope.drawBoard(
     layout: BoardLayout,
-    spec: HeadSpec,
     wood: Wood,
     activeIndex: Int,
     tunedIndices: Set<Int>,
     active: Color,
     tuned: Color,
-) {
-    val dp = layout.dp
-    val w = layout.headWidth
-    fun x(f: Float) = layout.headX(f)
-    fun y(f: Float) = layout.headY(f)
-    fun n(f: Float) = layout.neckX(f)
-    val bottom = spec.headBottom
-    // A little wider than the nut, so the outer strings stand inside the neck and not on its edge.
-    val neckLeft = 0.5f - (spec.nutSpread / 2f + BoardLayout.NeckPad)
-    val neckRight = 0.5f + (spec.nutSpread / 2f + BoardLayout.NeckPad)
-    val nutY = layout.nutY
-
-    val centreX = layout.width / 2f
-    val crownHalf = (spec.crownRight - spec.crownLeft) / 2f * BoardLayout.XSpread * w
-    val neckHalf = n(neckRight) - centreX
-    val shape = headShapeFor(spec, neckHalf / crownHalf)
-    val head = shape.path(centreX, crownHalf, 0f, nutY)
-    val bounds = head.getBounds()
-
-    // The neck under the nut: dark, with frets and one inlay, because a plain dark bar reads as
-    // a gap in the picture and not as part of the instrument.
-    val fretboard = Path().apply {
-        addRoundRect(
-            androidx.compose.ui.geometry.RoundRect(
-                left = n(neckLeft), top = nutY, right = n(neckRight), bottom = layout.height + 12f * dp,
-                topLeftCornerRadius = CornerRadius.Zero, topRightCornerRadius = CornerRadius.Zero,
-                bottomLeftCornerRadius = CornerRadius(6f * dp), bottomRightCornerRadius = CornerRadius(6f * dp),
-            ),
-        )
-    }
-    drawPath(fretboard, Brush.verticalGradient(listOf(wood.fretboardTop, wood.fretboardBottom), startY = nutY, endY = layout.height))
-    val neckSpan = layout.height - nutY
-    for (fret in listOf(0.27f, 0.52f, 0.74f, 0.92f)) {
-        val fy = nutY + neckSpan * fret
-        drawLine(Color(0xFFC9CDD2).copy(alpha = 0.42f), Offset(n(neckLeft), fy), Offset(n(neckRight), fy), 1.6f * dp)
-    }
-    drawCircle(wood.binding.copy(alpha = 0.55f), 3.2f * dp, Offset((n(neckLeft) + n(neckRight)) / 2f, nutY + neckSpan * 0.395f))
-
-    // The head: the wood, a faint grain, a soft sheen from the top left, and the binding.
-    drawPath(head, Brush.verticalGradient(listOf(wood.top, wood.bottom), startY = bounds.top, endY = nutY))
-    clipPath(head) {
-        val random = kotlin.random.Random(11)
-        val lines = 15
-        for (i in 0 until lines) {
-            val gx = bounds.left + bounds.width * (i + random.nextFloat() * 0.8f) / lines
-            val drift = (random.nextFloat() - 0.5f) * 14f * dp
-            val grain = Path().apply {
-                moveTo(gx, bounds.top)
-                cubicTo(gx + drift, bounds.top + bounds.height * 0.33f, gx - drift, bounds.top + bounds.height * 0.66f, gx + drift * 0.4f, nutY)
-            }
-            val dark = i % 3 != 0
-            drawPath(
-                grain,
-                if (dark) Color.Black.copy(alpha = 0.10f) else Color.White.copy(alpha = 0.07f),
-                style = Stroke(width = (0.8f + random.nextFloat() * 1.6f) * dp),
-            )
-        }
-        drawRect(
-            brush = Brush.linearGradient(
-                listOf(Color.White.copy(alpha = 0.16f), Color.Transparent),
-                start = Offset(bounds.left, bounds.top),
-                end = Offset(bounds.center.x, bounds.top + bounds.height * 0.55f),
-            ),
-            topLeft = bounds.topLeft,
-            size = bounds.size,
-        )
-    }
-    drawPath(head, Color.Black.copy(alpha = 0.55f), style = Stroke(width = 4.6f * dp, join = StrokeJoin.Round))
-    drawPath(head, wood.binding, style = Stroke(width = 2.4f * dp, join = StrokeJoin.Round))
-
-    // A bowed instrument's scroll: carved wood curled over the top of the pegbox.
-    if (spec.scroll) {
-        val centre = Offset(x(0.5f), y(0.1f))
-        val radius = w * 0.17f
-        drawCircle(Brush.verticalGradient(listOf(wood.top, wood.bottom), startY = centre.y - radius, endY = centre.y + radius), radius, centre)
-        drawCircle(Color.Black.copy(alpha = 0.55f), radius, centre, style = Stroke(4.6f * dp))
-        drawCircle(wood.binding, radius, centre, style = Stroke(2.4f * dp))
-        drawCircle(Color.Black.copy(alpha = 0.45f), radius * 0.45f, centre, style = Stroke(1.8f * dp))
-        drawCircle(Color.Black.copy(alpha = 0.35f), radius * 0.16f, centre, style = Stroke(1.6f * dp))
-    } else {
-        // The truss rod cover: a dark plate with a screw, the detail that says guitar.
-        val plateW = w * 0.15f
-        val plateTop = nutY * 0.50f
-        val plateBottom = nutY * 0.90f
-        val cx = (n(neckLeft) + n(neckRight)) / 2f
-        val plate = Path().apply {
-            moveTo(cx - plateW / 2f, plateTop + plateW / 2f)
-            arcTo(
-                androidx.compose.ui.geometry.Rect(cx - plateW / 2f, plateTop, cx + plateW / 2f, plateTop + plateW),
-                180f, 180f, false,
-            )
-            lineTo(cx + plateW * 0.30f, plateBottom)
-            lineTo(cx - plateW * 0.30f, plateBottom)
-            close()
-        }
-        drawPath(plate, Color(0xFF241711))
-        drawPath(plate, Color.White.copy(alpha = 0.10f), style = Stroke(1.2f * dp))
-        drawCircle(Color(0xFFC9CDD2), 2.6f * dp, Offset(cx, plateTop + plateW * 0.5f))
-        drawCircle(Color(0xFF6A6F76), 1.1f * dp, Offset(cx, plateTop + plateW * 0.5f))
-    }
-
-    // The nut: bone, the one bright line across the neck.
-    drawLine(
-        color = Color(0xFFF2E8D2),
-        start = Offset(n(neckLeft), nutY),
-        end = Offset(n(neckRight), nutY),
-        strokeWidth = 4f * dp,
-        cap = StrokeCap.Butt,
-    )
-
-    // Strings: straight down the neck from the nut, and from the nut out to their tuner. The
-    // wound bass strings are bronze and thick, the plain ones nickel and thin.
-    val count = layout.pegs.size
-    for (i in 0 until count) {
-        val peg = layout.pegs[i]
-        val isActive = i == activeIndex
-        val isTuned = i in tunedIndices
-        val wound = i < (count + 1) / 2
-        val base = if (wound) Color(0xFFD9B98A) else Color(0xFFDCE0E5)
-        val colour = when {
-            isActive -> active
-            isTuned -> androidx.compose.ui.graphics.lerp(base, tuned, 0.55f)
-            else -> base.copy(alpha = 0.82f)
-        }
-        val thickness = (2.5f - 1.4f * i / (count - 1).coerceAtLeast(1)) * dp
-        val slot = layout.slots[i]
-        if (layout.isDrone(i)) {
-            drawLine(colour, peg, Offset(peg.x, layout.height), thickness, StrokeCap.Round)
-        } else {
-            // The part below the nut is drawn by the vibrating layer for the active string.
-            if (!isActive) drawLine(colour, Offset(slot, layout.height), Offset(slot, nutY), thickness, StrokeCap.Round)
-            drawLine(colour, Offset(slot, nutY), peg, thickness, StrokeCap.Round)
-        }
-    }
-
-    // Tuners: a post on the head, a shaft out through the edge and a chrome knob beyond it. The
-    // string being tuned lights its own, so "which peg" is answered by colour, not by counting.
-    for (i in 0 until count) {
-        val peg = layout.pegs[i]
-        val knobCentre = layout.knobs[i]
-        val isActive = i == activeIndex
-        val isTuned = i in tunedIndices
-        val halo = when {
-            isActive -> active
-            isTuned -> tuned
-            else -> null
-        }
-        drawLine(Color(0xFFBFC4CA), peg, Offset(knobCentre.x, peg.y), 2.6f * dp, StrokeCap.Round)
-        // The bushing the string winds round: a chrome ring with the post in the middle.
-        drawCircle(Color.Black.copy(alpha = 0.5f), 7.6f * dp, peg)
-        drawCircle(Color(0xFFD7DBE0), 6.4f * dp, peg)
-        drawCircle(Color(0xFF9AA1A9), 3.4f * dp, peg)
-        drawCircle(Color(0xFFE9ECEF), 2f * dp, peg)
-
-        val knobTop = peg.y - 15f * dp
-        val knobRect = androidx.compose.ui.geometry.Rect(knobCentre.x - 9f * dp, knobTop, knobCentre.x + 9f * dp, knobTop + 30f * dp)
-        if (halo != null) {
-            drawRoundRect(
-                color = halo.copy(alpha = 0.95f),
-                topLeft = Offset(knobRect.left - 2.6f * dp, knobRect.top - 2.6f * dp),
-                size = Size(knobRect.width + 5.2f * dp, knobRect.height + 5.2f * dp),
-                cornerRadius = CornerRadius(11.6f * dp),
-            )
-        }
-        val chrome = if (wood.ebonyPegs) {
-            listOf(Color(0xFF5B463B), Color(0xFF241812), Color(0xFF120B08))
-        } else {
-            listOf(Color(0xFFFFFFFF), Color(0xFFC7CCD2), Color(0xFF7F868F))
-        }
-        drawRoundRect(
-            brush = Brush.horizontalGradient(chrome, startX = knobRect.left, endX = knobRect.right),
-            topLeft = knobRect.topLeft,
-            size = knobRect.size,
-            cornerRadius = CornerRadius(6f * dp),
-        )
-        drawRoundRect(
-            color = Color.Black.copy(alpha = 0.35f),
-            topLeft = knobRect.topLeft,
-            size = knobRect.size,
-            cornerRadius = CornerRadius(6f * dp),
-            style = Stroke(1f * dp),
-        )
-    }
-}
+) = drawHeadArt(layout.geo, wood, HeadDetail.Full, activeIndex, tunedIndices, active, tuned)
 
 /**
  * The string being tuned, as a line that shakes in proportion to what the microphone hears.

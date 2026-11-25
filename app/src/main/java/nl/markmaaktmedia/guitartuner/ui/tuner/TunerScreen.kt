@@ -139,14 +139,9 @@ private fun TopBar(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             HeadstockView(
-                layout = state.instrument.layout,
+                instrument = state.instrument,
                 stringCount = state.tuning.stringCount,
-                scale = state.instrument.headstockScale,
-                bodyColor = scheme.onSurfaceVariant.copy(alpha = 0.12f),
-                outlineColor = scheme.onSurfaceVariant,
-                pegColor = scheme.primary,
-                stringColor = scheme.onSurfaceVariant.copy(alpha = 0.6f),
-                modifier = Modifier.size(width = 27.dp, height = 40.dp),
+                modifier = Modifier.size(width = 34.dp, height = 46.dp),
             )
             Column(Modifier.weight(1f)) {
                 Text(

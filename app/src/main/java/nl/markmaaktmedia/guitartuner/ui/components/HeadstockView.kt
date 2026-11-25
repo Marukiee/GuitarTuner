@@ -2,42 +2,64 @@ package nl.markmaaktmedia.guitartuner.ui.components
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.drawscope.translate
 import nl.markmaaktmedia.guitartuner.domain.model.HeadstockLayout
 import nl.markmaaktmedia.guitartuner.domain.model.HeadstockScale
+import nl.markmaaktmedia.guitartuner.domain.model.Instrument
+import nl.markmaaktmedia.guitartuner.ui.tuner.HeadDetail
+import nl.markmaaktmedia.guitartuner.ui.tuner.HeadGeometry
+import nl.markmaaktmedia.guitartuner.ui.tuner.drawHeadArt
+import nl.markmaaktmedia.guitartuner.ui.tuner.wood
 
 /**
- * The silhouette of an instrument's head, drawn from its peg layout.
+ * A small picture of an instrument's head, drawn from its peg layout.
  *
  * This exists because a picker that lists "Acoustic guitar" and "Electric guitar" over
  * two identical drawings has told the player nothing. The tunings of those two are the
  * same; what differs is a slotted three a side head against six tuners in a line, and
  * that difference is instantly readable as a shape and not at all readable as a word.
  *
- * Everything is drawn from a normalised description rather than from a per instrument
- * vector, so a new instrument is a new entry in [HeadstockLayout] and nothing else.
+ * It is the same drawing as the head on the tuner board, just with less detail, so the picture in
+ * the instrument bar is the head you are about to tune and not a pictogram of one. Everything is
+ * drawn from a normalised description rather than from a per instrument vector, so a new
+ * instrument is a new entry in [nl.markmaaktmedia.guitartuner.domain.model.HeadstockLayout] and
+ * nothing else.
  */
 @Composable
 fun HeadstockView(
-    layout: HeadstockLayout,
+    instrument: Instrument,
     stringCount: Int,
-    scale: HeadstockScale,
     modifier: Modifier = Modifier,
-    bodyColor: Color,
-    outlineColor: Color,
-    pegColor: Color,
-    stringColor: Color,
 ) {
+    val spec = remember(instrument.layout, stringCount) { specFor(instrument.layout, stringCount) }
+    val wood = remember(instrument) { instrument.wood() }
+    val scale = instrument.headstockScale
     Canvas(modifier) {
-        val spec = specFor(layout, stringCount)
-        drawHead(spec, scale, bodyColor, outlineColor, pegColor, stringColor)
+        // The head is fitted to the picture by its width, with the tuners counted in, because a
+        // narrow picture is the usual case. The tuners are drawn larger than life: at 30 dp true
+        // proportions would shrink them to specks, and they are what says "tuner".
+        val pegScale = scale.pegFactor() * 1.55f
+        val width = size.width * 0.94f
+        val probe = HeadGeometry(spec, stringCount, 0f, 300f, size.height, unit = 1f, pegScale = pegScale)
+        val extent = probe.extentRight - probe.extentLeft
+        val headWidth = 300f * width / extent
+        val geo = HeadGeometry(spec, stringCount, 0f, headWidth, size.height, unit = headWidth / 300f, pegScale = pegScale)
+        // Centred on what is actually drawn, buttons included, which for a paddle is not the
+        // middle of its box.
+        val dx = size.width / 2f - (geo.extentLeft + geo.extentRight) / 2f
+        val factor = scale.sizeFactor()
+        clipRect {
+            scale(factor, factor, pivot = Offset(size.width / 2f, size.height)) {
+                translate(dx, 0f) {
+                    drawHeadArt(geo, wood, HeadDetail.Icon)
+                }
+            }
+        }
     }
 }
 
@@ -118,6 +140,8 @@ internal data class HeadSpec(
      * what makes a banjo stop looking like a banjo.
      */
     val dronePeg: Offset? = null,
+    /** The asymmetric Fender paddle, which the symmetric head outline cannot draw. */
+    val paddle: Boolean = false,
 )
 
 /**
@@ -183,6 +207,7 @@ internal fun specFor(layout: HeadstockLayout, stringCount: Int): HeadSpec = when
                 Offset(INLINE_POST_X, 0.12f + step * 0.56f)
             },
             nutSpread = nut,
+            paddle = true,
         )
     }
 
@@ -294,119 +319,6 @@ private fun pairedColumn(
     }
     return List(count) { index ->
         Offset(x, positions[if (downwards) index else count - 1 - index])
-    }
-}
-
-private fun DrawScope.drawHead(
-    spec: HeadSpec,
-    scale: HeadstockScale,
-    bodyColor: Color,
-    outlineColor: Color,
-    pegColor: Color,
-    stringColor: Color,
-) {
-    val factor = scale.sizeFactor()
-    val w = size.width * factor
-    val h = size.height * factor
-    val insetX = (size.width - w) / 2f
-    val insetY = size.height - h
-    // Every fraction in a [HeadSpec] is written left to right off a photograph, which is the
-    // front of the instrument: bass side on the left, the way a chord chart is drawn and the way
-    // the tuner apps this one follows show it. It is drawn exactly as written.
-    fun x(fraction: Float) = insetX + fraction * w
-    fun y(fraction: Float) = insetY + fraction * h
-
-    val bottom = spec.headBottom
-    val body = Path().apply {
-        moveTo(x(spec.crownLeft), y(spec.crownY))
-        cubicTo(
-            x(spec.crownLeft), y(0f),
-            x(spec.crownRight), y(0f),
-            x(spec.crownRight), y(spec.crownY),
-        )
-        cubicTo(
-            x(spec.crownRight), y(bottom * 0.55f),
-            x(spec.waistRight), y(bottom * 0.86f),
-            x(spec.neckRight), y(bottom),
-        )
-        lineTo(x(spec.neckRight), y(1f))
-        lineTo(x(spec.neckLeft), y(1f))
-        lineTo(x(spec.neckLeft), y(bottom))
-        cubicTo(
-            x(spec.waistLeft), y(bottom * 0.86f),
-            x(spec.crownLeft), y(bottom * 0.55f),
-            x(spec.crownLeft), y(spec.crownY),
-        )
-        close()
-    }
-
-    val outline = w * 0.035f
-    drawPath(body, bodyColor)
-    drawPath(body, outlineColor, style = Stroke(width = outline))
-
-    // The scroll. A bowed instrument's head is a carved spiral and nothing else on the
-    // list looks remotely like it, so it is worth the extra circles.
-    if (spec.scroll) {
-        val centre = Offset(x(0.5f), y(0.12f))
-        val radius = w * 0.20f
-        drawCircle(bodyColor, radius = radius, center = centre)
-        drawCircle(outlineColor, radius = radius, center = centre, style = Stroke(outline))
-        drawCircle(outlineColor, radius = radius * 0.40f, center = centre, style = Stroke(outline * 0.8f))
-    }
-
-    // Strings run straight up the neck to the nut and only then fan out to the tuners.
-    // Fanning the whole way, which is what the first version did, draws a bundle of
-    // lines converging under the nut and reads as a cobweb rather than as an instrument.
-    //
-    // The fan itself is kept shallow. On a real head the nut is nearly as wide as the
-    // spacing of the tuners, so the strings barely splay; drawing the nut narrow and the
-    // tuners far apart turns six near parallel lines into a wine glass, which is what
-    // this looked like before the nut was widened and the tuners brought in.
-    val nutY = bottom + (1f - bottom) * 0.22f
-    val stringWidth = (w * 0.028f).coerceAtLeast(1.0.dp.toPx())
-    val pegs = spec.pegs
-    pegs.forEachIndexed { index, peg ->
-        val slot = x(nutSlot(index, pegs.size, spec))
-        drawLine(stringColor, Offset(slot, y(1f)), Offset(slot, y(nutY)), stringWidth, StrokeCap.Round)
-        drawLine(stringColor, Offset(slot, y(nutY)), Offset(x(peg.x), y(peg.y)), stringWidth, StrokeCap.Round)
-    }
-
-    drawLine(
-        color = outlineColor,
-        start = Offset(x(spec.neckLeft), y(nutY)),
-        end = Offset(x(spec.neckRight), y(nutY)),
-        strokeWidth = outline * 0.9f,
-        cap = StrokeCap.Round,
-    )
-
-    // The drone runs down the neck from its own peg and never crosses the nut.
-    spec.dronePeg?.let { drone ->
-        drawLine(
-            color = stringColor,
-            start = Offset(x(drone.x), y(drone.y)),
-            end = Offset(x(drone.x), y(1f)),
-            strokeWidth = stringWidth,
-            cap = StrokeCap.Round,
-        )
-    }
-
-    val pegRadius = w * 0.052f * scale.pegFactor()
-    (pegs + listOfNotNull(spec.dronePeg)).forEach { peg ->
-        // Pushed away from the centre line, never toward it, so both sides stand out rather
-        // than one side standing out and the other burying itself in the wood.
-        val proud = if (peg.x < 0.5f) -spec.pegProud else spec.pegProud
-        // The shaft. Without it the buttons read as four dots painted beside the pegbox
-        // rather than as pegs driven through it, which is the one detail that says violin.
-        if (spec.pegProud > 0f) {
-            drawLine(
-                color = pegColor,
-                start = Offset(x(peg.x), y(peg.y)),
-                end = Offset(x(peg.x + proud), y(peg.y)),
-                strokeWidth = pegRadius * 0.55f,
-                cap = StrokeCap.Round,
-            )
-        }
-        drawCircle(pegColor, radius = pegRadius, center = Offset(x(peg.x + proud), y(peg.y)))
     }
 }
 

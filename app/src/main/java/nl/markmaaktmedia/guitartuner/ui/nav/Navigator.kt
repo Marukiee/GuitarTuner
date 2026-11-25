@@ -3,9 +3,10 @@ package nl.markmaaktmedia.guitartuner.ui.nav
 import androidx.activity.BackEventCompat
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -22,8 +23,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.util.lerp
 import kotlinx.coroutines.launch
 import nl.markmaaktmedia.guitartuner.ui.theme.TunerMotion
 import kotlin.coroutines.cancellation.CancellationException
@@ -51,6 +50,19 @@ class Navigator(initial: List<Route> = emptyList()) {
         val openness = Animatable(if (startOpen) 1f else 0f)
         var leaving by mutableStateOf(false)
         var exitToRight by mutableStateOf(true)
+
+        /** True while a back gesture holds the page, and while a cancelled one settles back. */
+        var dragging by mutableStateOf(false)
+
+        /**
+         * How far this page covers the one beneath it, 0 to 1. Arriving it follows the
+         * emphasised curve in time; leaving it follows the finger, so the page beneath comes
+         * back exactly as fast as this one goes.
+         */
+        fun cover(): Float {
+            val open = openness.value
+            return if (leaving || dragging) 1f - Emphasised.transform(1f - open) else Emphasised.transform(open)
+        }
     }
 
     val layers = mutableStateListOf<Layer>().apply { initial.forEach { add(Layer(it, startOpen = true)) } }
@@ -86,21 +98,32 @@ class Navigator(initial: List<Route> = emptyList()) {
 @Composable
 fun rememberNavigator(): Navigator = rememberSaveable(saver = Navigator.Saver) { Navigator() }
 
-/** How far a drag is allowed to scrub the transition before the gesture is committed. */
-private const val PeekTravel = 0.65f
+private val Emphasised = TunerMotion.Emphasised
 
-/** How far a page travels sideways on its way out, as a fraction of the screen width. */
-private const val ExitTravel = 0.30f
+/** A page arrives in this long. The same 350 ms as the other apps of the family. */
+private const val ArriveMillis = 350
 
-/** How far the page beneath sinks back while another covers it. */
-private const val SinkScale = 0.94f
+/** Going back from rest takes this long, less if the finger has already taken it part of the way. */
+private const val LeaveMillis = 300
+
+/** How far the page beneath slides away, as a fraction of the screen width. */
+private const val BeneathSlide = 1f / 3f
+
+/** How far the page beneath shrinks while another covers it. */
+private const val BeneathShrink = 0.08f
+
+/** How far the leaving page shrinks on its way out. */
+private const val LeaveShrink = 0.15f
 
 /**
  * Draws the root and every page over it, and owns the back gesture.
  *
- * The root sits back while a page covers it and grows into place as the page leaves, which is
- * what makes a half finished gesture worth making: the page you are going back to is already
- * moving.
+ * It is the shared axis the other apps of the family use (PixelPlayer, MarkMySteps): a page
+ * arrives from a third of the screen away while it fades in, and the page beneath slides the
+ * other way and shrinks a little. The back gesture seeks that same movement. The page follows
+ * the finger on a cubic, so a short pull moves it very little and a long pull sends it all the
+ * way, shrinking as it goes, and the page beneath comes back as it leaves. Letting go finishes
+ * the exit, and bringing the thumb back eases the page home.
  */
 @Composable
 fun NavHost(
@@ -115,20 +138,22 @@ fun NavHost(
         val top = navigator.layers.lastOrNull { !it.leaving } ?: return@PredictiveBackHandler
         try {
             events.collect { event ->
+                top.dragging = true
                 // The system says which edge the thumb came from, and the page leaves that
                 // way, so it moves with the hand instead of always sliding right.
                 top.exitToRight = event.swipeEdge == BackEventCompat.EDGE_LEFT
-                // Only part of the way there. A drag is a preview of leaving and not the
-                // leaving itself, so even a full swipe stops short and the commit plays the
-                // rest of the distance.
-                top.openness.snapTo(1f - PeekTravel * TunerMotion.Standard.transform(event.progress))
+                top.openness.snapTo(1f - event.progress)
             }
             top.leaving = true
+            top.dragging = false
         } catch (cancelled: CancellationException) {
             // The thumb came back. This coroutine is already cancelled, so the settle has to
             // run somewhere that is not, and the exception is not rethrown: for this API the
             // cancellation is the signal itself rather than a failure to propagate.
-            scope.launch { top.openness.animateTo(1f, TunerMotion.spatial()) }
+            scope.launch {
+                top.openness.animateTo(1f, tween(200, easing = LinearEasing))
+                top.dragging = false
+            }
         }
     }
 
@@ -137,10 +162,11 @@ fun NavHost(
             Modifier
                 .fillMaxSize()
                 .graphicsLayer {
-                    val cover = navigator.layers.firstOrNull()?.openness?.value ?: 0f
-                    val depth = lerp(1f, SinkScale, cover)
-                    scaleX = depth
-                    scaleY = depth
+                    val cover = navigator.layers.firstOrNull()?.cover() ?: 0f
+                    translationX = -size.width * BeneathSlide * cover
+                    val shrink = 1f - BeneathShrink * cover
+                    scaleX = shrink
+                    scaleY = shrink
                 },
         ) { root() }
 
@@ -148,11 +174,15 @@ fun NavHost(
             key(layer) {
                 LaunchedEffect(layer.leaving) {
                     if (!layer.leaving) {
-                        layer.openness.animateTo(1f, TunerMotion.spatial())
+                        layer.openness.animateTo(1f, tween(ArriveMillis, easing = LinearEasing))
                     } else {
                         // Picks up wherever a drag left it, which is what keeps a committed
                         // gesture from snapping back to full size before it leaves.
-                        layer.openness.animateTo(0f, TunerMotion.spatial())
+                        val remaining = layer.openness.value
+                        layer.openness.animateTo(
+                            0f,
+                            tween((remaining * LeaveMillis).toInt().coerceAtLeast(120), easing = LinearEasing),
+                        )
                         navigator.layers.remove(layer)
                     }
                 }
@@ -162,19 +192,28 @@ fun NavHost(
                         .fillMaxSize()
                         .graphicsLayer {
                             val open = layer.openness.value
-                            translationX = (1f - open) * size.width * ExitTravel *
-                                if (layer.exitToRight) 1f else -1f
-                            val sunk = navigator.layers.getOrNull(index + 1)?.openness?.value ?: 0f
-                            val shrink = lerp(0.90f, 1f, open) * lerp(1f, SinkScale, sunk)
-                            scaleX = shrink
-                            scaleY = shrink
-                            // Opaque for the whole peek, fading only on the way out. A page that
-                            // goes translucent under the thumb reads as broken, not as leaving.
-                            alpha = (open / (1f - PeekTravel)).coerceIn(0f, 1f)
-                            // Corners round off as it lifts, square up as it settles: the same
-                            // cue the system uses to say "this is a card now, not the screen".
-                            shape = RoundedCornerShape(lerp(28.dp.toPx(), 0f, open))
-                            clip = true
+                            var x: Float
+                            var scale: Float
+                            var fade = 1f
+                            if (layer.leaving || layer.dragging) {
+                                // Away: slow at first and then all at once, shrinking a little.
+                                val gone = 1f - open
+                                x = size.width * gone * gone * gone * if (layer.exitToRight) 1f else -1f
+                                scale = 1f - LeaveShrink * Emphasised.transform(gone)
+                            } else {
+                                val arrived = Emphasised.transform(open)
+                                x = size.width * BeneathSlide * (1f - arrived)
+                                scale = 1f
+                                fade = arrived
+                            }
+                            // A page that has another over it sinks away the same way the root does.
+                            val cover = navigator.layers.getOrNull(index + 1)?.cover() ?: 0f
+                            x -= size.width * BeneathSlide * cover
+                            scale *= 1f - BeneathShrink * cover
+                            translationX = x
+                            scaleX = scale
+                            scaleY = scale
+                            alpha = fade
                         },
                 ) { page(layer.route) }
             }
