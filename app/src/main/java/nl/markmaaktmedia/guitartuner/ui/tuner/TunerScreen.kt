@@ -1,7 +1,9 @@
 package nl.markmaaktmedia.guitartuner.ui.tuner
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -24,12 +26,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import nl.markmaaktmedia.guitartuner.R
 import nl.markmaaktmedia.guitartuner.domain.model.TunerUiState
 import nl.markmaaktmedia.guitartuner.ui.TunerViewModel
+import nl.markmaaktmedia.guitartuner.ui.components.HandOver
 import nl.markmaaktmedia.guitartuner.ui.components.InstrumentIcon
 import nl.markmaaktmedia.guitartuner.ui.components.InstrumentSheet
 import nl.markmaaktmedia.guitartuner.ui.components.TunerIconButton
@@ -54,57 +61,72 @@ fun TunerScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var showPicker by rememberSaveable { mutableStateOf(false) }
+    // How far the instrument panel is out of its bar.
+    val picker = remember { Animatable(0f) }
+    var bar by remember { mutableStateOf<LayoutCoordinates?>(null) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .statusBarsPadding()
-            .navigationBarsPadding()
-            .padding(horizontal = 16.dp),
-    ) {
-        updateCard()
+    Box(Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .padding(horizontal = 16.dp)
+                // What the panel covers is out of reach of a screen reader too.
+                .then(if (showPicker) Modifier.clearAndSetSemantics {} else Modifier),
+        ) {
+            updateCard()
 
-        TopBar(
-            state = state,
-            onPickInstrument = { showPicker = true },
-            onOpenSettings = onOpenSettings,
-        )
+            TopBar(
+                state = state,
+                onPickInstrument = { showPicker = true },
+                onOpenSettings = onOpenSettings,
+                // Gone once the panel has taken over from it, so it cannot peek out from behind.
+                barModifier = Modifier
+                    .onGloballyPositioned { bar = it }
+                    .graphicsLayer { alpha = if (picker.value < HandOver) 1f else 0f },
+            )
 
-        PitchLane(
-            readings = viewModel.reading,
-            holdProgress = viewModel.holdProgress,
-            target = state.activeString,
-            targetHz = state.activeString.targetHz(state.referenceHz),
-            allTuned = state.allTuned,
-            onPlayTone = { viewModel.playReferenceTone(state.activeStringIndex) },
-            onStartOver = viewModel::resetProgress,
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-        )
+            PitchLane(
+                readings = viewModel.reading,
+                holdProgress = viewModel.holdProgress,
+                target = state.activeString,
+                targetHz = state.activeString.targetHz(state.referenceHz),
+                allTuned = state.allTuned,
+                onPlayTone = { viewModel.playReferenceTone(state.activeStringIndex) },
+                onStartOver = viewModel::resetProgress,
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+            )
 
-        StringBoard(
-            instrument = state.instrument,
-            tuning = state.tuning,
-            activeIndex = state.activeStringIndex,
-            tunedIndices = state.tunedStringIndices,
-            soundingIndex = state.soundingStringIndex,
-            readings = viewModel.reading,
-            inputLevelDb = viewModel.inputLevelDb,
-            onSelect = viewModel::selectString,
-            onPlay = viewModel::playReferenceTone,
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-        )
+            StringBoard(
+                instrument = state.instrument,
+                tuning = state.tuning,
+                activeIndex = state.activeStringIndex,
+                tunedIndices = state.tunedStringIndices,
+                soundingIndex = state.soundingStringIndex,
+                readings = viewModel.reading,
+                inputLevelDb = viewModel.inputLevelDb,
+                onSelect = viewModel::selectString,
+                onPlay = viewModel::playReferenceTone,
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+            )
 
-        Spacer(Modifier.height(16.dp))
-    }
+            Spacer(Modifier.height(16.dp))
+        }
 
-    if (showPicker) {
-        InstrumentSheet(
-            instrument = state.instrument,
-            tuning = state.tuning,
-            onInstrument = viewModel::selectInstrument,
-            onTuning = viewModel::selectTuning,
-            onDismiss = { showPicker = false },
-        )
+        if (showPicker) {
+            InstrumentSheet(
+                instrument = state.instrument,
+                tuning = state.tuning,
+                onInstrument = viewModel::selectInstrument,
+                onTuning = viewModel::selectTuning,
+                onDismiss = { showPicker = false },
+                bar = bar,
+                barOuter = TopBarHeight / 2,
+                barInner = ConnectedInner,
+                open = picker,
+            )
+        }
     }
 }
 
@@ -113,6 +135,8 @@ private fun TopBar(
     state: TunerUiState,
     onPickInstrument: () -> Unit,
     onOpenSettings: () -> Unit,
+    /** For the instrument bar itself, which the panel grows out of. */
+    barModifier: Modifier = Modifier,
 ) {
     val scheme = MaterialTheme.colorScheme
     // A connected button group: round at the two ends, cut where the halves meet. The
@@ -131,6 +155,7 @@ private fun TopBar(
                 // same height. A round button visibly shorter than the bar it sits next to
                 // reads as a mistake, not as a hierarchy.
                 .height(TopBarHeight)
+                .then(barModifier)
                 .clip(connectedShape(0, 2, outer = TopBarHeight / 2, inner = ConnectedInner))
                 .background(scheme.surfaceContainerHigh)
                 .bouncyClickable(onClickLabel = stringResource(R.string.instrument_and_tuning), onClick = onPickInstrument)

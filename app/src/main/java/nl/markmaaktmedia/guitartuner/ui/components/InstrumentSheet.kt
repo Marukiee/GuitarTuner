@@ -1,41 +1,20 @@
 package nl.markmaaktmedia.guitartuner.ui.components
 
-import androidx.compose.animation.animateColorAsState
-import android.view.ViewGroup
+import android.view.HapticFeedbackConstants
 import androidx.activity.compose.PredictiveBackHandler
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
-import androidx.compose.ui.window.DialogWindowProvider
-import androidx.core.view.WindowCompat
-import kotlinx.coroutines.launch
-import kotlin.coroutines.cancellation.CancellationException
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -58,13 +37,46 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.lerp
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.dismiss
+import androidx.compose.ui.semantics.paneTitle
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.lerp
+import kotlin.coroutines.cancellation.CancellationException
+import kotlin.math.min
+import kotlinx.coroutines.launch
 import nl.markmaaktmedia.guitartuner.R
 import nl.markmaaktmedia.guitartuner.domain.model.Instrument
 import nl.markmaaktmedia.guitartuner.domain.model.Tuning
@@ -81,10 +93,14 @@ import nl.markmaaktmedia.guitartuner.ui.theme.groupedShape
  * player who switches to a bass is the same player who wants to know whether it is still
  * in drop D. Splitting them across two screens turns one decision into two navigations.
  *
- * It opens the way the panels of MarkMySteps do: the page dims, and the panel grows out of the
- * top, from the bar it belongs to, instead of rising from the bottom edge. A panel that gets
- * taller because another instrument has more tunings grows instead of jumping. The back
- * gesture shrinks it a little and lightens the dim under the thumb, and closes it when let go.
+ * It moves the way the menus of MarkMySteps do. The panel starts as exactly the bar, in the bar's
+ * colour and with its corners, grows from there while the page dims, and folds back into it. So bar
+ * and panel are one thing, not a block that appears next to a button. A panel that gets taller
+ * because another instrument has more tunings grows instead of jumping. The back gesture shrinks it
+ * a little and lightens the dim under the thumb, and folds it away when let go.
+ *
+ * It is drawn over the tuner and not in a window of its own, so that it can start on the very pixels
+ * of the bar.
  */
 @Composable
 fun InstrumentSheet(
@@ -93,139 +109,205 @@ fun InstrumentSheet(
     onInstrument: (Instrument) -> Unit,
     onTuning: (Tuning) -> Unit,
     onDismiss: () -> Unit,
+    /** The bar it comes out of, with the radius of its round end and of its cut end. */
+    bar: LayoutCoordinates?,
+    barOuter: Dp,
+    barInner: Dp,
+    /** 0 is the bar itself, 1 the whole panel. The caller owns it, to hide the bar meanwhile. */
+    open: Animatable<Float, AnimationVector1D>,
 ) {
     val scheme = MaterialTheme.colorScheme
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
+    val view = LocalView.current
 
     LaunchedEffect(instrument) {
         val index = Instrument.entries.indexOf(instrument)
         if (index >= 0) listState.animateScrollToItem(index)
     }
 
-    val shown = remember { MutableTransitionState(false) }
-    val back = remember { Animatable(0f) }
-    LaunchedEffect(Unit) { shown.targetState = true }
-    // Once the panel has played its way out, it leaves.
-    LaunchedEffect(shown.currentState, shown.isIdle) {
-        if (shown.isIdle && !shown.currentState && !shown.targetState) onDismiss()
+    // Where this overlay is, and from that where the bar is within it.
+    var overlay by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    val anchor = remember(overlay, bar) {
+        val here = overlay
+        if (here != null && here.isAttached && bar != null && bar.isAttached) {
+            here.localBoundingBoxOf(bar, clipBounds = false)
+        } else {
+            null
+        }
     }
-    val close: () -> Unit = { shown.targetState = false }
-    val origin = TransformOrigin(0.3f, 0f)
+    val back = remember { Animatable(0f) }
+    var closing by remember { mutableStateOf(false) }
 
-    Dialog(
-        onDismissRequest = close,
-        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
-    ) {
-        // The window itself: no dim and no animation of its own, the panel does both.
-        val view = LocalView.current
-        SideEffect {
-            (view.parent as? DialogWindowProvider)?.window?.let { window ->
-                window.setDimAmount(0f)
-                window.setWindowAnimations(0)
-                window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-                WindowCompat.setDecorFitsSystemWindows(window, false)
+    LaunchedEffect(anchor != null) {
+        if (anchor != null && !closing) {
+            view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+            open.animateTo(1f, tween(OpenMillis, easing = TunerMotion.Emphasised))
+        }
+    }
+    val close: () -> Unit = {
+        if (!closing) {
+            closing = true
+            view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+            scope.launch {
+                open.animateTo(0f, tween(CloseMillis, easing = FastOutSlowInEasing))
+                onDismiss()
             }
         }
-        PredictiveBackHandler { events ->
-            try {
-                events.collect { back.snapTo(it.progress) }
-                close()
-            } catch (cancelled: CancellationException) {
-                scope.launch { back.animateTo(0f, tween(200)) }
-            }
+    }
+
+    PredictiveBackHandler { events ->
+        try {
+            events.collect { back.snapTo(it.progress) }
+            close()
+        } catch (cancelled: CancellationException) {
+            scope.launch { back.animateTo(0f, tween(200)) }
         }
-        val dim by animateFloatAsState(
-            targetValue = if (shown.targetState) 0.32f else 0f,
-            animationSpec = TunerMotion.fadeSpec(),
-            label = "panelDim",
-        )
+    }
+
+    BoxWithConstraints(Modifier.fillMaxSize().onGloballyPositioned { overlay = it }) {
         Box(
             Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = dim * (1f - back.value * 0.5f)))
+                .drawBehind { drawRect(Color.Black, alpha = Dim * open.value * (1f - back.value * 0.5f)) }
                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { close() },
-        ) {
-            AnimatedVisibility(
-                visibleState = shown,
-                // Right under the instrument bar: its status bar, its own margin and its height.
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .statusBarsPadding()
-                    .padding(top = 8.dp + 58.dp + 8.dp, start = 12.dp, end = 12.dp),
-                enter = scaleIn(TunerMotion.spatial(), initialScale = 0.85f, transformOrigin = origin) +
-                    fadeIn(TunerMotion.fadeSpec()),
-                exit = scaleOut(tween(220, easing = TunerMotion.Standard), targetScale = 0.9f, transformOrigin = origin) +
-                    fadeOut(tween(160)),
-            ) {
-                val shape = RoundedCornerShape(32.dp)
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .graphicsLayer {
-                            val k = 1f - 0.08f * back.value
-                            scaleX = k
-                            scaleY = k
-                            transformOrigin = origin
-                        }
-                        .clip(shape)
-                        .background(scheme.surfaceContainerLow)
-                        .border(1.dp, scheme.outlineVariant.copy(alpha = 0.55f), shape)
-                        // A tap on the panel is not a tap on the dim behind it.
-                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
-                        .animateContentSize(TunerMotion.spatial()),
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .heightIn(max = (LocalConfiguration.current.screenHeightDp - 190).dp)
-                            .verticalScroll(rememberScrollState())
-                            .padding(top = 20.dp, bottom = 20.dp),
-                    ) {
-                        SheetHeading(stringResource(R.string.sheet_instrument))
-                        LazyRow(
-                            state = listState,
-                            contentPadding = PaddingValues(horizontal = 20.dp),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        ) {
-                            items(Instrument.entries, key = { it.name }) { entry ->
-                                InstrumentCard(
-                                    instrument = entry,
-                                    selected = entry == instrument,
-                                    onClick = { onInstrument(entry) },
-                                )
-                            }
-                        }
+        )
 
-                        Spacer(Modifier.height(24.dp))
-                        SheetHeading(stringResource(R.string.sheet_tuning))
-                        Column(
-                            modifier = Modifier.padding(horizontal = 20.dp),
-                            verticalArrangement = Arrangement.spacedBy(GroupedSpacing),
-                        ) {
-                            instrument.tunings.forEachIndexed { index, entry ->
-                                TuningRow(
-                                    tuning = entry,
-                                    selected = entry.id == tuning.id,
-                                    shape = groupedShape(index, instrument.tunings.size),
-                                    onClick = { onTuning(entry) },
-                                )
-                            }
-                        }
+        if (anchor == null) return@BoxWithConstraints
+        val density = LocalDensity.current
+        val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+        // The panel keeps the same distance to both sides of the screen as the bar does to its own.
+        val edge = with(density) { min(anchor.left, constraints.maxWidth - anchor.right).coerceAtLeast(0f) }
+        val start = anchor.translate(-edge, -anchor.top)
+        val shapeAt: (Float) -> Shape = { k -> unfolding(start, barOuter, barInner, rtl, k) }
+        val label = stringResource(R.string.instrument_and_tuning)
+        val sideways = with(density) { edge.toDp() }
+        val top = with(density) { anchor.top.coerceAtLeast(0f).toDp() }
 
-                        if (tuning.isReentrant) {
-                            Text(
-                                text = stringResource(R.string.reentrant_note),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = scheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
-                            )
-                        }
+        Column(
+            modifier = Modifier
+                .navigationBarsPadding()
+                .padding(start = sideways, end = sideways, top = top, bottom = 16.dp)
+                .fillMaxWidth()
+                .graphicsLayer {
+                    val k = open.value
+                    // Tied to how open it is, so folding away ends on the bar at its own size.
+                    val shrink = 1f - 0.08f * back.value * k
+                    scaleX = shrink
+                    scaleY = shrink
+                    transformOrigin = TransformOrigin(if (rtl) 0.7f else 0.3f, 0f)
+                    alpha = (k / HandOver).coerceIn(0f, 1f)
+                    shape = shapeAt(k)
+                    clip = true
+                }
+                .drawWithContent {
+                    drawContent()
+                    val k = open.value
+                    // It starts in the bar's colour and passes into its own.
+                    val tint = (1f - k / 0.55f).coerceIn(0f, 1f)
+                    if (tint > 0f) drawRect(scheme.surfaceContainerHigh, alpha = tint)
+                    // Twice the width: the outer half is clipped away.
+                    drawOutline(
+                        outline = shapeAt(k).createOutline(size, layoutDirection, this),
+                        color = scheme.outlineVariant.copy(alpha = 0.55f * k),
+                        style = Stroke(2.dp.toPx()),
+                    )
+                }
+                .background(scheme.surfaceContainerLow)
+                // A tap on the panel is not a tap on the dim behind it.
+                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
+                .semantics {
+                    paneTitle = label
+                    dismiss {
+                        close()
+                        true
                     }
+                }
+                .animateContentSize(TunerMotion.sizeSpring()),
+        ) {
+            Column(
+                modifier = Modifier
+                    .graphicsLayer { alpha = ((open.value - 0.1f) / 0.6f).coerceIn(0f, 1f) }
+                    .verticalScroll(rememberScrollState())
+                    .padding(top = 20.dp, bottom = 20.dp),
+            ) {
+                SheetHeading(stringResource(R.string.sheet_instrument))
+                LazyRow(
+                    state = listState,
+                    contentPadding = PaddingValues(horizontal = 20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    items(Instrument.entries, key = { it.name }) { entry ->
+                        InstrumentCard(
+                            instrument = entry,
+                            selected = entry == instrument,
+                            onClick = { onInstrument(entry) },
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(24.dp))
+                SheetHeading(stringResource(R.string.sheet_tuning))
+                Column(
+                    modifier = Modifier.padding(horizontal = 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(GroupedSpacing),
+                ) {
+                    instrument.tunings.forEachIndexed { index, entry ->
+                        TuningRow(
+                            tuning = entry,
+                            selected = entry.id == tuning.id,
+                            shape = groupedShape(index, instrument.tunings.size),
+                            onClick = { onTuning(entry) },
+                        )
+                    }
+                }
+
+                if (tuning.isReentrant) {
+                    Text(
+                        text = stringResource(R.string.reentrant_note),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = scheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                    )
                 }
             }
         }
     }
 }
+
+/**
+ * The panel's outline [k] of the way open: at 0 exactly the bar, which sits at [bar] inside the
+ * panel and has one round end and one cut end, and at 1 the whole panel with the same corner all
+ * round.
+ */
+private fun unfolding(bar: Rect, outer: Dp, inner: Dp, rtl: Boolean, k: Float): Shape = object : Shape {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
+        fun corner(from: Dp) = CornerRadius(with(density) { lerp(from, PanelCorner, k).toPx() })
+        val left = corner(if (rtl) inner else outer)
+        val right = corner(if (rtl) outer else inner)
+        return Outline.Rounded(
+            RoundRect(
+                rect = lerp(bar, Rect(0f, 0f, size.width, size.height), k),
+                topLeft = left,
+                topRight = right,
+                bottomRight = right,
+                bottomLeft = left,
+            ),
+        )
+    }
+}
+
+/** The corners of the panel when it is all the way out. */
+private val PanelCorner = 28.dp
+
+/** How dark the page behind gets. */
+private const val Dim = 0.32f
+
+/** The share of the way in which the panel takes over from the bar. */
+internal const val HandOver = 0.3f
+
+private const val OpenMillis = 240
+private const val CloseMillis = 220
 
 @Composable
 private fun SheetHeading(text: String) {
