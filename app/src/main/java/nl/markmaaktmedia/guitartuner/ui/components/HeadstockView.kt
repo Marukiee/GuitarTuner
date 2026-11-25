@@ -158,21 +158,9 @@ internal fun pegEdge(nutSpread: Float): Float = 0.5f + nutSpread / 2f
 private const val INLINE_POST_X = 0.29f
 
 internal fun specFor(layout: HeadstockLayout, stringCount: Int): HeadSpec = when (layout) {
-    HeadstockLayout.THREE_PER_SIDE -> {
-        // A slotted head: wide, gently flared, symmetric.
-        val perSide = stringCount / 2
-        val nut = 0.34f
-        HeadSpec(
-            crownLeft = 0.24f, crownRight = 0.76f,
-            waistLeft = 0.28f, waistRight = 0.72f,
-            neckLeft = 0.33f, neckRight = 0.67f,
-            headBottom = 0.70f, crownY = 0.10f,
-            pegs = sidePegs(perSide, perSide, 1f - pegEdge(nut), pegEdge(nut), 0.18f, 0.56f),
-            nutSpread = nut,
-        )
-    }
-
-    HeadstockLayout.FOUR_THREE -> {
+    // The standard six string head is the long one the seven string already had, which is the
+    // head people liked best: a shorter, squarer six string head read as a box with tuners.
+    HeadstockLayout.THREE_PER_SIDE, HeadstockLayout.FOUR_THREE -> {
         val nut = 0.34f
         HeadSpec(
             crownLeft = 0.22f, crownRight = 0.78f,
