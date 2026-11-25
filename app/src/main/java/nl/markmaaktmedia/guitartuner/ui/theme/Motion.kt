@@ -35,8 +35,8 @@ object TunerMotion {
 
     /** Movement with no overshoot: sliding panels, scroll driven offsets. */
     fun <T> spatial(): FiniteAnimationSpec<T> = spring(
-        dampingRatio = 0.9f,
-        stiffness = Spring.StiffnessMediumLow,
+        dampingRatio = Spring.DampingRatioNoBouncy,
+        stiffness = UnfoldStiffness,
     )
 
     /** Movement allowed a little overshoot: chips, indicators, the string rail. */
@@ -45,7 +45,10 @@ object TunerMotion {
         stiffness = Spring.StiffnessMediumLow,
     )
 
-    /** The loosest one, kept for the press scale only. */
+    /** What a finger pushes: Material's fast spatial spring, the one the other apps press with. */
+    fun <T> press(): FiniteAnimationSpec<T> = spring(dampingRatio = 0.6f, stiffness = 800f)
+
+    /** The loosest one, kept for the bell on the tuning line. */
     fun <T> bouncy(): FiniteAnimationSpec<T> = spring(
         dampingRatio = Spring.DampingRatioLowBouncy,
         stiffness = Spring.StiffnessMedium,
@@ -53,10 +56,13 @@ object TunerMotion {
 
     /** Size changes need their own visibility threshold to avoid a final jitter. */
     fun sizeSpring(): FiniteAnimationSpec<IntSize> = spring(
-        dampingRatio = 0.85f,
-        stiffness = Spring.StiffnessMediumLow,
+        dampingRatio = Spring.DampingRatioNoBouncy,
+        stiffness = UnfoldStiffness,
         visibilityThreshold = IntSize(1, 1),
     )
+
+    /** Things that unfold or grow settle without a wobble, on the same spring as in the other apps. */
+    private const val UnfoldStiffness = 380f
 
     /**
      * The needle.
@@ -71,6 +77,9 @@ object TunerMotion {
 
     /** How far a pressed element shrinks. Small enough to feel, not to distract. */
     const val PressedScale = 0.96f
+
+    /** How long it stays down after the finger has gone, so that a quick tap still shows. */
+    const val PressHoldMillis = 220L
 
     /** The pick spinner: two eased turns, with a breath between them. */
     const val SpinnerCycleMillis = 2600

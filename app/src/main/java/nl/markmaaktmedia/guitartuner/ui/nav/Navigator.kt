@@ -100,11 +100,11 @@ fun rememberNavigator(): Navigator = rememberSaveable(saver = Navigator.Saver) {
 
 private val Emphasised = TunerMotion.Emphasised
 
-/** A page arrives in this long. The same 350 ms as the other apps of the family. */
-private const val ArriveMillis = 350
-
-/** Going back from rest takes this long, less if the finger has already taken it part of the way. */
-private const val LeaveMillis = 300
+/**
+ * A page arrives in this long, and going back from rest takes as long again, less if the finger has
+ * already taken it part of the way. The same 350 ms both ways as the other apps of the family.
+ */
+private const val PageMillis = 350
 
 /** How far the page beneath slides away, as a fraction of the screen width. */
 private const val BeneathSlide = 1f / 3f
@@ -174,14 +174,14 @@ fun NavHost(
             key(layer) {
                 LaunchedEffect(layer.leaving) {
                     if (!layer.leaving) {
-                        layer.openness.animateTo(1f, tween(ArriveMillis, easing = LinearEasing))
+                        layer.openness.animateTo(1f, tween(PageMillis, easing = LinearEasing))
                     } else {
                         // Picks up wherever a drag left it, which is what keeps a committed
                         // gesture from snapping back to full size before it leaves.
                         val remaining = layer.openness.value
                         layer.openness.animateTo(
                             0f,
-                            tween((remaining * LeaveMillis).toInt().coerceAtLeast(120), easing = LinearEasing),
+                            tween((remaining * PageMillis).toInt().coerceAtLeast(120), easing = LinearEasing),
                         )
                         navigator.layers.remove(layer)
                     }
