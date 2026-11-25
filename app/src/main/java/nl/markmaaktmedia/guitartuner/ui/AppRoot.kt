@@ -8,6 +8,7 @@ import android.net.Uri
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -53,6 +54,7 @@ import nl.markmaaktmedia.guitartuner.ui.settings.UpdatesPage
 import nl.markmaaktmedia.guitartuner.ui.theme.CardSquircle
 import nl.markmaaktmedia.guitartuner.ui.theme.LocalTunerSignals
 import nl.markmaaktmedia.guitartuner.ui.theme.TunerIcons
+import nl.markmaaktmedia.guitartuner.ui.theme.TunerMotion
 import nl.markmaaktmedia.guitartuner.ui.tuner.TunerScreen
 import nl.markmaaktmedia.markupdate.MarkUpdate
 import nl.markmaaktmedia.markupdate.ui.UpdateCard
@@ -148,32 +150,39 @@ fun AppRoot(
     NavHost(
         navigator = navigator,
         root = {
-            if (state.micPermission == MicPermissionState.Granted) {
-                TunerScreen(
-                    viewModel,
-                    onOpenSettings = { navigator.push(Route.Settings) },
-                    updateCard = {
-                        if (showUpdateCard) {
-                            UpdateCard(
-                                modifier = Modifier.padding(top = 8.dp),
-                                style = UpdateCardStyle(
-                                    shape = CardSquircle,
-                                    successColor = LocalTunerSignals.current.inTune,
-                                ),
+            // Saying yes to the microphone fades the tuner in over the question.
+            Crossfade(
+                targetState = state.micPermission == MicPermissionState.Granted,
+                animationSpec = TunerMotion.fadeSpec(),
+                label = "gate",
+            ) { granted ->
+                if (granted) {
+                    TunerScreen(
+                        viewModel,
+                        onOpenSettings = { navigator.push(Route.Settings) },
+                        updateCard = {
+                            if (showUpdateCard) {
+                                UpdateCard(
+                                    modifier = Modifier.padding(top = 8.dp),
+                                    style = UpdateCardStyle(
+                                        shape = CardSquircle,
+                                        successColor = LocalTunerSignals.current.inTune,
+                                    ),
+                                )
+                            }
+                        },
+                    )
+                } else {
+                    PermissionGate(
+                        permanentlyDenied = state.micPermission == MicPermissionState.PermanentlyDenied,
+                        onRequest = { permissionLauncher.launch(Manifest.permission.RECORD_AUDIO) },
+                        onOpenSettings = {
+                            context.startActivity(
+                                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")),
                             )
-                        }
-                    },
-                )
-            } else {
-                PermissionGate(
-                    permanentlyDenied = state.micPermission == MicPermissionState.PermanentlyDenied,
-                    onRequest = { permissionLauncher.launch(Manifest.permission.RECORD_AUDIO) },
-                    onOpenSettings = {
-                        context.startActivity(
-                            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")),
-                        )
-                    },
-                )
+                        },
+                    )
+                }
             }
         },
         page = { route ->

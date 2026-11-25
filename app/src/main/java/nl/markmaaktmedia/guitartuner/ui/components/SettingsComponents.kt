@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -76,11 +77,13 @@ fun GroupedRow(
     modifier: Modifier = Modifier,
     color: Color = MaterialTheme.colorScheme.surfaceContainer,
     onClick: (() -> Unit)? = null,
+    /** Only for a row whose corners move, because a neighbour is coming or going. */
+    shape: Shape = groupedShape(index, total),
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val base = modifier
         .fillMaxWidth()
-        .clip(groupedShape(index, total))
+        .clip(shape)
         .background(color)
     Column(
         modifier = if (onClick != null) base.bouncyClickable(onClick = onClick) else base,
@@ -240,8 +243,9 @@ fun StepperRow(
     onIncrease: () -> Unit,
     decreaseLabel: String,
     increaseLabel: String,
+    shape: Shape = groupedShape(index, total),
 ) {
-    GroupedRow(index, total) {
+    GroupedRow(index, total, shape = shape) {
         Row(RowPadding, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             RowIcon(icon)
             RowText(title, subtitle, Modifier.weight(1f))

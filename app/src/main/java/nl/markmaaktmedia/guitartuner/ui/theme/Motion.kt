@@ -1,10 +1,18 @@
 package nl.markmaaktmedia.guitartuner.ui.theme
 
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.ui.unit.IntSize
 
 /**
@@ -63,6 +71,20 @@ object TunerMotion {
 
     /** Things that unfold or grow settle without a wobble, on the same spring as in the other apps. */
     private const val UnfoldStiffness = 380f
+
+    /** How a row or a block makes room for itself, */
+    fun unfold(): EnterTransition = expandVertically(sizeSpring()) + fadeIn(fadeSpec())
+
+    /** and how it gives the room back. */
+    fun fold(): ExitTransition = shrinkVertically(sizeSpring()) + fadeOut(fadeSpec())
+
+    /**
+     * One thing taking the place of another where it stands: the old one goes much faster than the
+     * new one comes, so the two are hardly seen on top of each other.
+     */
+    fun swap(): ContentTransform =
+        fadeIn(spring(Spring.DampingRatioNoBouncy, 1600f)) togetherWith
+            fadeOut(spring(Spring.DampingRatioNoBouncy, 3800f))
 
     /**
      * The needle.

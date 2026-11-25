@@ -3,11 +3,6 @@ package nl.markmaaktmedia.guitartuner.ui.appearance
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -124,7 +119,7 @@ fun AppearanceScreen(viewModel: TunerViewModel, onBack: () -> Unit) {
                     }
                     AnimatedContent(
                         targetState = appearance.style,
-                        transitionSpec = { fadeIn(TunerMotion.fadeSpec()) togetherWith fadeOut(TunerMotion.fadeSpec()) },
+                        transitionSpec = { TunerMotion.swap() },
                         label = "styleDescription",
                     ) { style ->
                         Text(
@@ -145,8 +140,8 @@ fun AppearanceScreen(viewModel: TunerViewModel, onBack: () -> Unit) {
 private fun Note(visible: Boolean, text: String) {
     AnimatedVisibility(
         visible = visible,
-        enter = expandVertically(TunerMotion.sizeSpring()) + fadeIn(TunerMotion.fadeSpec()),
-        exit = shrinkVertically(TunerMotion.sizeSpring()) + fadeOut(TunerMotion.fadeSpec()),
+        enter = TunerMotion.unfold(),
+        exit = TunerMotion.fold(),
     ) {
         Text(
             text = text,

@@ -2,11 +2,15 @@ package nl.markmaaktmedia.guitartuner.ui.components
 
 import android.view.HapticFeedbackConstants
 import androidx.activity.compose.PredictiveBackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -248,27 +252,37 @@ fun InstrumentSheet(
 
                 Spacer(Modifier.height(24.dp))
                 SheetHeading(stringResource(R.string.sheet_tuning))
-                Column(
-                    modifier = Modifier.padding(horizontal = 20.dp),
-                    verticalArrangement = Arrangement.spacedBy(GroupedSpacing),
-                ) {
-                    instrument.tunings.forEachIndexed { index, entry ->
-                        TuningRow(
-                            tuning = entry,
-                            selected = entry.id == tuning.id,
-                            shape = groupedShape(index, instrument.tunings.size),
-                            onClick = { onTuning(entry) },
-                        )
-                    }
-                }
+                // Another instrument has other tunings, which fade over while the panel resizes.
+                AnimatedContent(
+                    targetState = instrument to tuning,
+                    contentKey = { it.first },
+                    transitionSpec = { TunerMotion.swap() using SizeTransform(clip = false) { _, _ -> snap() } },
+                    label = "tunings",
+                ) { (of, chosen) ->
+                    Column {
+                        Column(
+                            modifier = Modifier.padding(horizontal = 20.dp),
+                            verticalArrangement = Arrangement.spacedBy(GroupedSpacing),
+                        ) {
+                            of.tunings.forEachIndexed { index, entry ->
+                                TuningRow(
+                                    tuning = entry,
+                                    selected = entry.id == chosen.id,
+                                    shape = groupedShape(index, of.tunings.size),
+                                    onClick = { onTuning(entry) },
+                                )
+                            }
+                        }
 
-                if (tuning.isReentrant) {
-                    Text(
-                        text = stringResource(R.string.reentrant_note),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = scheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
-                    )
+                        AnimatedVisibility(chosen.isReentrant, enter = TunerMotion.unfold(), exit = TunerMotion.fold()) {
+                            Text(
+                                text = stringResource(R.string.reentrant_note),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = scheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                            )
+                        }
+                    }
                 }
             }
         }

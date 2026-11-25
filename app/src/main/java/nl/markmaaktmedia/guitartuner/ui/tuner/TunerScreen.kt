@@ -1,6 +1,7 @@
 package nl.markmaaktmedia.guitartuner.ui.tuner
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,6 +19,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,6 +44,7 @@ import nl.markmaaktmedia.guitartuner.ui.components.InstrumentSheet
 import nl.markmaaktmedia.guitartuner.ui.components.TunerIconButton
 import nl.markmaaktmedia.guitartuner.ui.components.bouncyClickable
 import nl.markmaaktmedia.guitartuner.ui.theme.TunerIcons
+import nl.markmaaktmedia.guitartuner.ui.theme.TunerMotion
 import nl.markmaaktmedia.guitartuner.ui.theme.connectedShape
 
 /**
@@ -64,6 +67,8 @@ fun TunerScreen(
     // How far the instrument panel is out of its bar.
     val picker = remember { Animatable(0f) }
     var bar by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    // Another instrument's head fades in rather than snapping into place.
+    val boardFade = rememberFadeIn(state.instrument)
 
     Box(Modifier.fillMaxSize()) {
         Column(
@@ -108,7 +113,7 @@ fun TunerScreen(
                 inputLevelDb = viewModel.inputLevelDb,
                 onSelect = viewModel::selectString,
                 onPlay = viewModel::playReferenceTone,
-                modifier = Modifier.weight(1f).fillMaxWidth(),
+                modifier = Modifier.weight(1f).fillMaxWidth().graphicsLayer { alpha = boardFade.value },
             )
 
             Spacer(Modifier.height(16.dp))
@@ -128,6 +133,16 @@ fun TunerScreen(
             )
         }
     }
+}
+
+/** 1 from the start, and from 0 back to 1 each time [of] becomes something else. */
+@Composable
+private fun rememberFadeIn(of: Any): Animatable<Float, AnimationVector1D> {
+    val started = remember { booleanArrayOf(false) }
+    // Made anew with the change, so the first frame of the new thing is already see through.
+    val fade = remember(of) { Animatable(if (started[0]) 0f else 1f).also { started[0] = true } }
+    LaunchedEffect(fade) { fade.animateTo(1f, TunerMotion.fadeSpec()) }
+    return fade
 }
 
 @Composable

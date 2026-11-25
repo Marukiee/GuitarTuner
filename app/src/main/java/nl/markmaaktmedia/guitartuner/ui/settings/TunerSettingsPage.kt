@@ -1,8 +1,13 @@
 package nl.markmaaktmedia.guitartuner.ui.settings
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -11,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlin.math.roundToInt
 import nl.markmaaktmedia.guitartuner.R
 import nl.markmaaktmedia.guitartuner.domain.model.Note
 import nl.markmaaktmedia.guitartuner.ui.TunerViewModel
@@ -19,8 +25,9 @@ import nl.markmaaktmedia.guitartuner.ui.components.SectionHeader
 import nl.markmaaktmedia.guitartuner.ui.components.SettingsGroup
 import nl.markmaaktmedia.guitartuner.ui.components.StepperRow
 import nl.markmaaktmedia.guitartuner.ui.components.SwitchRow
+import nl.markmaaktmedia.guitartuner.ui.theme.GroupedSpacing
 import nl.markmaaktmedia.guitartuner.ui.theme.TunerIcons
-import kotlin.math.roundToInt
+import nl.markmaaktmedia.guitartuner.ui.theme.TunerMotion
 
 /**
  * Everything about how the tuner listens and answers: the pitch it measures against, the
@@ -37,21 +44,30 @@ internal fun TunerSettingsPage(viewModel: TunerViewModel, onBack: () -> Unit) {
     PageFrame(stringResource(R.string.settings_tuner), onBack) {
         SectionHeader(stringResource(R.string.section_pitch))
         SettingsGroup {
-            val total = if (moved) 2 else 1
-            StepperRow(
-                0, total, TunerIcons.Calibration,
-                stringResource(R.string.reference_pitch), stringResource(R.string.reference_pitch_sub),
-                value = stringResource(R.string.hertz, state.referenceHz.roundToInt()),
-                onDecrease = { viewModel.setReferencePitch(state.referenceHz - 1f) },
-                onIncrease = { viewModel.setReferencePitch(state.referenceHz + 1f) },
-                decreaseLabel = stringResource(R.string.lower),
-                increaseLabel = stringResource(R.string.raise),
-            )
-            if (moved) {
-                ActionRow(
-                    1, 2, TunerIcons.Restart, stringResource(R.string.reference_pitch_reset),
-                    onClick = { viewModel.setReferencePitch(Note.STANDARD_REFERENCE_HZ) },
+            // One child of the group, so the gap between the two rows comes and goes with the second.
+            Column {
+                // The first row's lower corners follow the second row in and out.
+                val lower by animateDpAsState(if (moved) 4.dp else 24.dp, TunerMotion.spatial(), label = "pitchCorner")
+                StepperRow(
+                    0, if (moved) 2 else 1, TunerIcons.Calibration,
+                    stringResource(R.string.reference_pitch), stringResource(R.string.reference_pitch_sub),
+                    value = stringResource(R.string.hertz, state.referenceHz.roundToInt()),
+                    onDecrease = { viewModel.setReferencePitch(state.referenceHz - 1f) },
+                    onIncrease = { viewModel.setReferencePitch(state.referenceHz + 1f) },
+                    decreaseLabel = stringResource(R.string.lower),
+                    increaseLabel = stringResource(R.string.raise),
+                    shape = RoundedCornerShape(
+                        topStart = 24.dp, topEnd = 24.dp,
+                        bottomStart = lower.coerceAtLeast(0.dp), bottomEnd = lower.coerceAtLeast(0.dp),
+                    ),
                 )
+                AnimatedVisibility(moved, enter = TunerMotion.unfold(), exit = TunerMotion.fold()) {
+                    ActionRow(
+                        1, 2, TunerIcons.Restart, stringResource(R.string.reference_pitch_reset),
+                        onClick = { viewModel.setReferencePitch(Note.STANDARD_REFERENCE_HZ) },
+                        modifier = Modifier.padding(top = GroupedSpacing),
+                    )
+                }
             }
         }
 
