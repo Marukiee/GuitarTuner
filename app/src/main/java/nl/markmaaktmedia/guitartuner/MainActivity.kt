@@ -98,6 +98,10 @@ class MainActivity : AppCompatActivity() {
             "fail" -> MarkUpdate.get().showFailurePreview("No connection to GitHub")
             "clear" -> MarkUpdate.get().reset()
         }
+        intent.getStringExtra("headstyle")?.let { name ->
+            nl.markmaaktmedia.guitartuner.ui.tuner.HeadStyle.entries.firstOrNull { it.name.equals(name, ignoreCase = true) }
+                ?.let { nl.markmaaktmedia.guitartuner.ui.tuner.HeadStyleChoice.current = it }
+        }
         intent.getStringExtra("demo")?.let { viewModel.runDemo(it, intent.getIntExtra("string", -1)) }
     }
 }

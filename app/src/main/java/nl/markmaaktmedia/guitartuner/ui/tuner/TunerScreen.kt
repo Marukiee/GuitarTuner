@@ -30,7 +30,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import nl.markmaaktmedia.guitartuner.R
 import nl.markmaaktmedia.guitartuner.domain.model.TunerUiState
 import nl.markmaaktmedia.guitartuner.ui.TunerViewModel
-import nl.markmaaktmedia.guitartuner.ui.components.HeadstockView
+import nl.markmaaktmedia.guitartuner.ui.components.InstrumentIcon
 import nl.markmaaktmedia.guitartuner.ui.components.InstrumentSheet
 import nl.markmaaktmedia.guitartuner.ui.components.TunerIconButton
 import nl.markmaaktmedia.guitartuner.ui.components.bouncyClickable
@@ -134,15 +134,11 @@ private fun TopBar(
                 .clip(connectedShape(0, 2, outer = TopBarHeight / 2, inner = ConnectedInner))
                 .background(scheme.surfaceContainerHigh)
                 .bouncyClickable(onClickLabel = stringResource(R.string.instrument_and_tuning), onClick = onPickInstrument)
-                .padding(start = 14.dp, end = 14.dp),
+                .padding(start = 7.dp, end = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            HeadstockView(
-                instrument = state.instrument,
-                stringCount = state.tuning.stringCount,
-                modifier = Modifier.size(width = 34.dp, height = 46.dp),
-            )
+            InstrumentIcon(instrument = state.instrument, modifier = Modifier.size(44.dp))
             Column(Modifier.weight(1f)) {
                 Text(
                     text = stringResource(state.instrument.nameRes),

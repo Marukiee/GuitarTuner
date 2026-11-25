@@ -16,12 +16,11 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -41,8 +40,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
@@ -102,6 +99,7 @@ fun StringBoard(
     val signals = LocalTunerSignals.current
     val density = LocalDensity.current
 
+    val style = HeadStyleChoice.current
     val spec = remember(instrument.layout, tuning.stringCount) {
         specFor(boardLayout(instrument.layout), tuning.stringCount)
     }
@@ -111,7 +109,8 @@ fun StringBoard(
     }
     val activeColor by animateColorAsState(
         targetValue = when (status) {
-            null -> scheme.primary
+            // Quiet again: a string that is done stays green.
+            null -> if (activeIndex in tunedIndices) signals.inTune else scheme.primary
             TuningStatus.IN_TUNE -> signals.inTune
             TuningStatus.FLAT -> signals.flat
             TuningStatus.SHARP -> signals.sharp
@@ -125,19 +124,21 @@ fun StringBoard(
         val width = constraints.maxWidth.toFloat()
         val height = constraints.maxHeight.toFloat()
 
-        val layout = remember(spec, tuning.stringCount, width, height) {
-            BoardLayout.of(spec, tuning.stringCount, width, height, dp)
+        val layout = remember(spec, style, tuning.stringCount, width, height) {
+            BoardLayout.of(spec, style, tuning.stringCount, width, height, dp)
         }
 
-        val wood = remember(instrument) { instrument.wood() }
+        val colors = scheme.headColors(style)
         Canvas(Modifier.fillMaxSize()) {
-            drawBoard(
-                layout = layout,
-                wood = wood,
+            drawExpressiveHead(
+                g = layout.geo,
+                style = style,
+                colors = colors,
                 activeIndex = activeIndex,
                 tunedIndices = tunedIndices,
                 active = activeColor,
                 tuned = signals.inTune,
+                reach = layout.bubbles,
             )
         }
 
@@ -159,6 +160,8 @@ fun StringBoard(
                 isTuned = string.physicalIndex in tunedIndices,
                 isInTune = inTuneNow && string.physicalIndex == activeIndex,
                 isSounding = string.physicalIndex == soundingIndex,
+                style = style,
+                activeColor = activeColor,
                 onClick = { onSelect(string.physicalIndex) },
                 onLongClick = { onPlay(string.physicalIndex) },
                 size = with(density) { layout.bubbleDiameter.toDp() },
@@ -194,7 +197,14 @@ private class BoardLayout(
     fun isDrone(index: Int) = geo.isDrone(index)
 
     companion object {
-        fun of(spec: HeadSpec, count: Int, width: Float, height: Float, dp: Float): BoardLayout {
+        fun of(
+            spec: HeadSpec,
+            style: HeadStyle,
+            count: Int,
+            width: Float,
+            height: Float,
+            dp: Float,
+        ): BoardLayout {
             val gutter = 4f * dp
             // Large enough to tap with a thumb, small enough that three fit down one side.
             val wanted = 50f * dp
@@ -217,8 +227,17 @@ private class BoardLayout(
                 val ys = spread(column.map { peg[it].y }, gap, diameter / 2f, height - diameter / 2f)
                 column.forEachIndexed { i, index -> bubbleY[index] = ys[i] }
             }
+            val frame = Frame(geo, style)
             val bubbles = peg.indices.map { i ->
-                val px = if (peg[i].x < centre) diameter / 2f + 2f * dp else width - diameter / 2f - 2f * dp
+                val side = if (peg[i].x < centre) -1f else 1f
+                val near = diameter / 2f + 2f * dp
+                val px = if (style == HeadStyle.BUTTONS) {
+                    // The button is the tuner, so it stands just off the side of the head.
+                    (frame.edge(peg[i].y, side) + side * (20f * geo.unit + diameter / 2f))
+                        .coerceIn(near, width - near)
+                } else {
+                    if (side < 0f) near else width - near
+                }
                 Offset(px, bubbleY[i])
             }
             return BoardLayout(geo, width, height, dp, bubbles, diameter)
@@ -236,15 +255,6 @@ private class BoardLayout(
         }
     }
 }
-
-private fun DrawScope.drawBoard(
-    layout: BoardLayout,
-    wood: Wood,
-    activeIndex: Int,
-    tunedIndices: Set<Int>,
-    active: Color,
-    tuned: Color,
-) = drawHeadArt(layout.geo, wood, HeadDetail.Full, activeIndex, tunedIndices, active, tuned)
 
 /**
  * The string being tuned, as a line that shakes in proportion to what the microphone hears.
@@ -278,7 +288,7 @@ private fun VibratingString(
         val peg = layout.pegs.getOrNull(activeIndex) ?: return@Canvas
         val slot = layout.slots[activeIndex]
         val top = if (layout.isDrone(activeIndex)) peg.y else layout.nutY
-        val bottom = layout.height
+        val bottom = layout.height - (NeckInsetDd + 8f) * layout.geo.unit
         val dp = layout.dp
         val path = Path()
         val steps = 28
@@ -289,7 +299,7 @@ private fun VibratingString(
             val py = top + t * (bottom - top)
             if (s == 0) path.moveTo(px, py) else path.lineTo(px, py)
         }
-        drawPath(path, color, style = Stroke(width = 1.9f * dp, cap = StrokeCap.Round))
+        drawPath(path, color, style = Stroke(width = 3.4f * dp, cap = StrokeCap.Round))
     }
 }
 
@@ -304,6 +314,8 @@ private fun StringBubble(
     isTuned: Boolean,
     isInTune: Boolean,
     isSounding: Boolean,
+    style: HeadStyle,
+    activeColor: Color,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     size: Dp,
@@ -312,31 +324,38 @@ private fun StringBubble(
     val scheme = MaterialTheme.colorScheme
     val signals = LocalTunerSignals.current
 
+    val buttons = style == HeadStyle.BUTTONS
     val container by animateColorAsState(
         targetValue = when {
             isInTune -> signals.inTune
-            isTuned -> signals.inTune.copy(alpha = 0.22f)
-            isActive -> scheme.primaryContainer
-            else -> scheme.surfaceContainerHigh
+            isActive -> activeColor
+            // On a tuner button a see through green would let its own stem shine through.
+            isTuned -> if (buttons) signals.inTune else signals.inTune.copy(alpha = 0.22f)
+            buttons -> scheme.tertiary
+            style == HeadStyle.BLOCKS -> scheme.secondaryContainer
+            else -> scheme.surfaceContainerHighest
         },
         animationSpec = TunerMotion.colourSpec(),
         label = "bubbleContainer",
     )
     val content by animateColorAsState(
         targetValue = when {
-            isInTune -> signals.onSignal
-            isTuned -> signals.inTune
-            isActive -> scheme.onPrimaryContainer
-            else -> scheme.onSurfaceVariant
+            isInTune || isActive -> signals.onSignal
+            isTuned -> if (buttons) signals.onSignal else signals.inTune
+            buttons -> scheme.onTertiary
+            style == HeadStyle.BLOCKS -> scheme.onSecondaryContainer
+            else -> scheme.onSurface
         },
         animationSpec = TunerMotion.colourSpec(),
         label = "bubbleContent",
     )
-    val ringWidth by animateDpAsState(
-        targetValue = if (isActive) 2.5.dp else 0.dp,
+    // The shape morph of Material's expressive buttons: the chosen one squares up.
+    val corner by animateDpAsState(
+        targetValue = if (isActive) 16.dp else size / 2,
         animationSpec = TunerMotion.spatial(),
-        label = "bubbleRing",
+        label = "bubbleCorner",
     )
+    val shape = RoundedCornerShape(corner.coerceAtLeast(0.dp))
     // The sounding bubble swells while the reference tone plays, which is the only
     // confirmation that the sound came from this app and not from the room.
     val swell by animateFloatAsState(
@@ -349,20 +368,19 @@ private fun StringBubble(
         modifier = modifier
             .size(size)
             .scale(swell)
-            .clip(CircleShape)
+            .clip(shape)
             .background(container)
-            .border(ringWidth, scheme.primary, CircleShape)
             .bouncyClickable(role = Role.RadioButton, onClickLabel = string.fullLabel, onLongClick = onLongClick, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = string.label,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
             color = content,
         )
         AnimatedVisibility(
-            visible = isTuned && !isInTune,
+            visible = isTuned && !isInTune && !buttons,
             enter = scaleIn(TunerMotion.springy()) + fadeIn(),
             exit = scaleOut() + fadeOut(),
             modifier = Modifier.align(Alignment.TopEnd),

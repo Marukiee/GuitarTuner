@@ -266,10 +266,10 @@ private fun InstrumentCard(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        HeadstockView(
+        InstrumentIcon(
             instrument = instrument,
-            stringCount = instrument.defaultTuning.stringCount,
-            modifier = Modifier.size(width = 64.dp, height = 78.dp),
+            modifier = Modifier.size(64.dp),
+            selected = selected,
         )
         Text(
             text = stringResource(instrument.shortNameRes),
