@@ -53,8 +53,11 @@ enum class HeadstockLayout {
     SCROLL,
 }
 
-/** Rough physical size of the head, so a ukulele is not drawn at cello scale. */
-enum class HeadstockScale { SMALL, MEDIUM, LARGE }
+/** The figure an instrument has in the picker. */
+enum class Silhouette { ACOUSTIC, ELECTRIC, BASS, BANJO, MANDOLIN, BOWED }
+
+/** Rough physical size, so a ukulele is not drawn at cello scale. */
+enum class InstrumentSize { SMALL, MEDIUM, LARGE }
 
 enum class Instrument(
     @StringRes val nameRes: Int,
@@ -67,15 +70,19 @@ enum class Instrument(
     /** One line in the picker saying what actually differs about this instrument. */
     @StringRes val subtitleRes: Int,
     val layout: HeadstockLayout,
-    val headstockScale: HeadstockScale,
+    val silhouette: Silhouette,
+    val size: InstrumentSize,
     val tunings: List<Tuning>,
+    /** The string count on the icon, for the variant of a figure that only differs by that. */
+    val badge: String? = null,
 ) {
     ACOUSTIC(
         nameRes = R.string.instrument_acoustic,
         shortNameRes = R.string.instrument_acoustic_short,
         subtitleRes = R.string.instrument_acoustic_sub,
         layout = HeadstockLayout.THREE_PER_SIDE,
-        headstockScale = HeadstockScale.MEDIUM,
+        silhouette = Silhouette.ACOUSTIC,
+        size = InstrumentSize.MEDIUM,
         tunings = Tunings.acousticGuitar,
     ),
     ELECTRIC(
@@ -83,7 +90,8 @@ enum class Instrument(
         shortNameRes = R.string.instrument_electric_short,
         subtitleRes = R.string.instrument_electric_sub,
         layout = HeadstockLayout.INLINE,
-        headstockScale = HeadstockScale.MEDIUM,
+        silhouette = Silhouette.ELECTRIC,
+        size = InstrumentSize.MEDIUM,
         tunings = Tunings.electricGuitar,
     ),
     GUITAR_7(
@@ -91,7 +99,9 @@ enum class Instrument(
         shortNameRes = R.string.instrument_guitar_7_short,
         subtitleRes = R.string.instrument_guitar_7_sub,
         layout = HeadstockLayout.FOUR_THREE,
-        headstockScale = HeadstockScale.MEDIUM,
+        silhouette = Silhouette.ELECTRIC,
+        size = InstrumentSize.MEDIUM,
+        badge = "7",
         tunings = Tunings.sevenString,
     ),
     BASS_4(
@@ -99,7 +109,8 @@ enum class Instrument(
         shortNameRes = R.string.instrument_bass_4_short,
         subtitleRes = R.string.instrument_bass_4_sub,
         layout = HeadstockLayout.TWO_PER_SIDE,
-        headstockScale = HeadstockScale.LARGE,
+        silhouette = Silhouette.BASS,
+        size = InstrumentSize.LARGE,
         tunings = Tunings.bassFour,
     ),
     BASS_5(
@@ -107,7 +118,9 @@ enum class Instrument(
         shortNameRes = R.string.instrument_bass_5_short,
         subtitleRes = R.string.instrument_bass_5_sub,
         layout = HeadstockLayout.INLINE,
-        headstockScale = HeadstockScale.LARGE,
+        silhouette = Silhouette.BASS,
+        size = InstrumentSize.LARGE,
+        badge = "5",
         tunings = Tunings.bassFive,
     ),
     BASS_6(
@@ -115,7 +128,9 @@ enum class Instrument(
         shortNameRes = R.string.instrument_bass_6_short,
         subtitleRes = R.string.instrument_bass_6_sub,
         layout = HeadstockLayout.INLINE,
-        headstockScale = HeadstockScale.LARGE,
+        silhouette = Silhouette.BASS,
+        size = InstrumentSize.LARGE,
+        badge = "6",
         tunings = Tunings.bassSix,
     ),
     UKULELE(
@@ -123,7 +138,8 @@ enum class Instrument(
         shortNameRes = R.string.instrument_ukulele_short,
         subtitleRes = R.string.instrument_ukulele_sub,
         layout = HeadstockLayout.TWO_PER_SIDE,
-        headstockScale = HeadstockScale.SMALL,
+        silhouette = Silhouette.ACOUSTIC,
+        size = InstrumentSize.SMALL,
         tunings = Tunings.ukulele,
     ),
     BANJO(
@@ -131,7 +147,8 @@ enum class Instrument(
         shortNameRes = R.string.instrument_banjo_short,
         subtitleRes = R.string.instrument_banjo_sub,
         layout = HeadstockLayout.BANJO,
-        headstockScale = HeadstockScale.MEDIUM,
+        silhouette = Silhouette.BANJO,
+        size = InstrumentSize.MEDIUM,
         tunings = Tunings.banjo,
     ),
     MANDOLIN(
@@ -139,7 +156,8 @@ enum class Instrument(
         shortNameRes = R.string.instrument_mandolin_short,
         subtitleRes = R.string.instrument_mandolin_sub,
         layout = HeadstockLayout.PAIRED_FOUR,
-        headstockScale = HeadstockScale.SMALL,
+        silhouette = Silhouette.MANDOLIN,
+        size = InstrumentSize.SMALL,
         tunings = Tunings.mandolin,
     ),
     VIOLIN(
@@ -147,7 +165,8 @@ enum class Instrument(
         shortNameRes = R.string.instrument_violin_short,
         subtitleRes = R.string.instrument_violin_sub,
         layout = HeadstockLayout.SCROLL,
-        headstockScale = HeadstockScale.MEDIUM,
+        silhouette = Silhouette.BOWED,
+        size = InstrumentSize.MEDIUM,
         tunings = Tunings.violin,
     ),
     CELLO(
@@ -155,7 +174,8 @@ enum class Instrument(
         shortNameRes = R.string.instrument_cello_short,
         subtitleRes = R.string.instrument_cello_sub,
         layout = HeadstockLayout.SCROLL,
-        headstockScale = HeadstockScale.LARGE,
+        silhouette = Silhouette.BOWED,
+        size = InstrumentSize.LARGE,
         tunings = Tunings.cello,
     );
 

@@ -6,11 +6,6 @@ import nl.markmaaktmedia.guitartuner.domain.model.HeadstockLayout
 /**
  * A head, as the few numbers it takes to draw one.
  *
- * The outline is described by an x fraction per side at three heights rather than by a
- * single width, because the two most recognisable heads on the list are the ones that are
- * not symmetric. A Fender has every tuner along one straight edge; drawn symmetrically it
- * is an acoustic with the pegs moved over, which is exactly what the first version drew.
- *
  * [pegs] is ordered **by nut slot**, not by position on the head. String one leaves the
  * leftmost slot at the nut and climbs to `pegs[0]`, string two to `pegs[1]`, and so on.
  *
@@ -26,16 +21,11 @@ import nl.markmaaktmedia.guitartuner.domain.model.HeadstockLayout
  * of two, of three, or for six in a line down one edge.
  */
 internal data class HeadSpec(
+    /** The widest the head gets, as x fractions of the picture. */
     val crownLeft: Float,
     val crownRight: Float,
-    val waistLeft: Float,
-    val waistRight: Float,
-    val neckLeft: Float,
-    val neckRight: Float,
     /** Where the head ends and the neck begins, as a fraction of the height. */
     val headBottom: Float,
-    /** How far down the crown's curve reaches before the sides take over. */
-    val crownY: Float,
     /** Peg positions as (x, y) fractions, in nut slot order. */
     val pegs: List<Offset>,
     /** How wide the strings sit at the nut, as a fraction of the width. */
@@ -44,48 +34,30 @@ internal data class HeadSpec(
     val paired: Boolean = false,
     val scroll: Boolean = false,
     /**
-     * How far outside the string line the peg *buttons* are drawn, as a width fraction.
-     *
-     * A bowed instrument is the one head where where the string ends and where the tuner is
-     * seen are not the same place: the pegs pass through the sides of the pegbox, so the
-     * strings terminate inside it and the buttons stand proud of it. Drawing both at the
-     * button leaves the strings crossing outside the box; drawing both at the string leaves a
-     * pegbox with four dots painted on it and no violin in sight.
-     */
-    val pegProud: Float = 0f,
-    /**
      * A tuner partway down the neck whose string never reaches the nut. A banjo's drone
      * is the only one, and running its string to the nut like the others is precisely
      * what makes a banjo stop looking like a banjo.
      */
     val dronePeg: Offset? = null,
-    /** The asymmetric Fender paddle, which the symmetric head outline cannot draw. */
-    val paddle: Boolean = false,
 )
 
 /**
  * Where a peg column sits, given how wide the strings are at the nut.
  *
  * Lined up with the outermost nut slot, so the outer string leaves the nut straight up and
- * turns off to its peg over the shortest run on the head. It is also what a real head looks
- * like: the posts sit a couple of millimetres outside a nut nearly as wide as they are, not
- * out at the edges of the paddle.
+ * turns off to its peg over the shortest run on the head.
  */
 internal fun pegEdge(nutSpread: Float): Float = 0.5f + nutSpread / 2f
 
-/** The Fender post line, out at the bass edge rather than beside the nut. */
-private const val INLINE_POST_X = 0.29f
-
 internal fun specFor(layout: HeadstockLayout, stringCount: Int): HeadSpec = when (layout) {
-    // The standard six string head is the long one the seven string already had, which is the
-    // head people liked best: a shorter, squarer six string head read as a box with tuners.
-    HeadstockLayout.THREE_PER_SIDE, HeadstockLayout.FOUR_THREE -> {
+    // One head for six and seven strings. An inline head is drawn with its tuners split over both
+    // sides too: six buttons down one edge would stand taller than the head, and split is how the
+    // player sees them from behind the neck.
+    HeadstockLayout.THREE_PER_SIDE, HeadstockLayout.FOUR_THREE, HeadstockLayout.INLINE -> {
         val nut = 0.34f
         HeadSpec(
             crownLeft = 0.22f, crownRight = 0.78f,
-            waistLeft = 0.27f, waistRight = 0.73f,
-            neckLeft = 0.32f, neckRight = 0.68f,
-            headBottom = 0.74f, crownY = 0.08f,
+            headBottom = 0.74f,
             pegs = sidePegs(
                 stringCount - stringCount / 2, stringCount / 2,
                 1f - pegEdge(nut), pegEdge(nut), 0.15f, 0.60f,
@@ -94,38 +66,12 @@ internal fun specFor(layout: HeadstockLayout, stringCount: Int): HeadSpec = when
         )
     }
 
-    HeadstockLayout.INLINE -> {
-        // The Fender paddle. Every tuner on one edge, and the outline asymmetric to match:
-        // the paddle bulges past the posts on the bass side and curves away on the treble
-        // side, which is the whole silhouette.
-        val nut = 0.30f
-        HeadSpec(
-            crownLeft = 0.22f, crownRight = 0.68f,
-            waistLeft = 0.28f, waistRight = 0.71f,
-            neckLeft = 0.33f, neckRight = 0.67f,
-            headBottom = 0.80f, crownY = 0.06f,
-            // One straight row of posts hard against the bass edge, which is the whole
-            // silhouette, so this is the one layout that does not take its x from [pegEdge].
-            // The reversed index is the rule again: the outermost string at the nut is the
-            // one nearest this edge, so it takes the post nearest the nut, and the rest run
-            // up between the posts to the top of the paddle.
-            pegs = List(stringCount) { index ->
-                val step = if (stringCount == 1) 0.5f else (stringCount - 1 - index) / (stringCount - 1f)
-                Offset(INLINE_POST_X, 0.12f + step * 0.56f)
-            },
-            nutSpread = nut,
-            paddle = true,
-        )
-    }
-
     HeadstockLayout.TWO_PER_SIDE -> {
         // Short and square: nothing like the long flare of a six string head.
         val nut = 0.34f
         HeadSpec(
             crownLeft = 0.24f, crownRight = 0.76f,
-            waistLeft = 0.28f, waistRight = 0.72f,
-            neckLeft = 0.33f, neckRight = 0.67f,
-            headBottom = 0.54f, crownY = 0.15f,
+            headBottom = 0.54f,
             pegs = sidePegs(
                 stringCount - stringCount / 2, stringCount / 2,
                 1f - pegEdge(nut), pegEdge(nut), 0.16f, 0.38f,
@@ -141,9 +87,7 @@ internal fun specFor(layout: HeadstockLayout, stringCount: Int): HeadSpec = when
         val nut = 0.36f
         HeadSpec(
             crownLeft = 0.23f, crownRight = 0.77f,
-            waistLeft = 0.27f, waistRight = 0.73f,
-            neckLeft = 0.32f, neckRight = 0.68f,
-            headBottom = 0.70f, crownY = 0.06f,
+            headBottom = 0.70f,
             pegs = pairedColumn(perSide, 1f - pegEdge(nut), 0.16f, 0.56f, downwards = false) +
                 pairedColumn(perSide, pegEdge(nut), 0.16f, 0.56f, downwards = true),
             nutSpread = nut,
@@ -155,9 +99,7 @@ internal fun specFor(layout: HeadstockLayout, stringCount: Int): HeadSpec = when
         val nut = 0.32f
         HeadSpec(
             crownLeft = 0.22f, crownRight = 0.78f,
-            waistLeft = 0.27f, waistRight = 0.73f,
-            neckLeft = 0.34f, neckRight = 0.66f,
-            headBottom = 0.50f, crownY = 0.13f,
+            headBottom = 0.50f,
             pegs = sidePegs(2, 2, 1f - pegEdge(nut), pegEdge(nut), 0.15f, 0.35f),
             nutSpread = nut,
             // The drone tuner sits partway down the neck, off to the treble side, and its
@@ -167,21 +109,17 @@ internal fun specFor(layout: HeadstockLayout, stringCount: Int): HeadSpec = when
     }
 
     HeadstockLayout.SCROLL -> {
-        // A pegbox: narrow, straight sided, the scroll curled over the top and the pegs
-        // pushed through the sides so their buttons stand proud of it.
+        // A pegbox: narrow and straight sided, with the scroll curled over the top.
         val nut = 0.24f
         HeadSpec(
             crownLeft = 0.34f, crownRight = 0.66f,
-            waistLeft = 0.34f, waistRight = 0.66f,
-            neckLeft = 0.37f, neckRight = 0.63f,
-            headBottom = 0.80f, crownY = 0.28f,
+            headBottom = 0.80f,
             pegs = listOf(
                 Offset(1f - pegEdge(nut), 0.66f), Offset(1f - pegEdge(nut), 0.44f),
                 Offset(pegEdge(nut), 0.44f), Offset(pegEdge(nut), 0.66f),
             ).take(stringCount),
             nutSpread = nut,
             scroll = true,
-            pegProud = 0.10f,
         )
     }
 }

@@ -76,11 +76,7 @@ import kotlin.math.sin
  * they belong to, so "which peg do I turn" is answered by looking across rather than by
  * counting.
  *
- * The head is drawn from the same [HeadSpec] as the small silhouettes in the instrument
- * picker, so every instrument keeps its own peg layout. A Fender style head with six tuners
- * in a line would stack six bubbles in one column taller than the head, so inline heads are
- * drawn here with the tuners split over both sides, which is also how the player sees them
- * from behind the neck.
+ * Every instrument keeps its own peg layout, described by its [HeadSpec].
  */
 @Composable
 fun StringBoard(
@@ -99,9 +95,8 @@ fun StringBoard(
     val signals = LocalTunerSignals.current
     val density = LocalDensity.current
 
-    val style = HeadStyleChoice.current
     val spec = remember(instrument.layout, tuning.stringCount) {
-        specFor(boardLayout(instrument.layout), tuning.stringCount)
+        specFor(instrument.layout, tuning.stringCount)
     }
     val status by readings.select(null as TuningStatus?) { it?.status }
     val inTuneNow by readings.select(false) {
@@ -124,21 +119,19 @@ fun StringBoard(
         val width = constraints.maxWidth.toFloat()
         val height = constraints.maxHeight.toFloat()
 
-        val layout = remember(spec, style, tuning.stringCount, width, height) {
-            BoardLayout.of(spec, style, tuning.stringCount, width, height, dp)
+        val layout = remember(spec, tuning.stringCount, width, height) {
+            BoardLayout.of(spec, tuning.stringCount, width, height, dp)
         }
 
-        val colors = scheme.headColors(style)
+        val colors = scheme.headColors()
         Canvas(Modifier.fillMaxSize()) {
-            drawExpressiveHead(
+            drawHead(
                 g = layout.geo,
-                style = style,
                 colors = colors,
                 activeIndex = activeIndex,
                 tunedIndices = tunedIndices,
                 active = activeColor,
                 tuned = signals.inTune,
-                reach = layout.bubbles,
             )
         }
 
@@ -160,7 +153,6 @@ fun StringBoard(
                 isTuned = string.physicalIndex in tunedIndices,
                 isInTune = inTuneNow && string.physicalIndex == activeIndex,
                 isSounding = string.physicalIndex == soundingIndex,
-                style = style,
                 activeColor = activeColor,
                 onClick = { onSelect(string.physicalIndex) },
                 onLongClick = { onPlay(string.physicalIndex) },
@@ -174,10 +166,6 @@ fun StringBoard(
         }
     }
 }
-
-/** Inline heads are split over both sides, see [StringBoard]. Everything else keeps its own. */
-private fun boardLayout(layout: HeadstockLayout): HeadstockLayout =
-    if (layout == HeadstockLayout.INLINE) HeadstockLayout.FOUR_THREE else layout
 
 /** Where every part of the board sits, in pixels of the board. */
 private class BoardLayout(
@@ -197,14 +185,7 @@ private class BoardLayout(
     fun isDrone(index: Int) = geo.isDrone(index)
 
     companion object {
-        fun of(
-            spec: HeadSpec,
-            style: HeadStyle,
-            count: Int,
-            width: Float,
-            height: Float,
-            dp: Float,
-        ): BoardLayout {
+        fun of(spec: HeadSpec, count: Int, width: Float, height: Float, dp: Float): BoardLayout {
             val gutter = 4f * dp
             // Large enough to tap with a thumb, small enough that three fit down one side.
             val wanted = 50f * dp
@@ -227,17 +208,8 @@ private class BoardLayout(
                 val ys = spread(column.map { peg[it].y }, gap, diameter / 2f, height - diameter / 2f)
                 column.forEachIndexed { i, index -> bubbleY[index] = ys[i] }
             }
-            val frame = Frame(geo, style)
             val bubbles = peg.indices.map { i ->
-                val side = if (peg[i].x < centre) -1f else 1f
-                val near = diameter / 2f + 2f * dp
-                val px = if (style == HeadStyle.BUTTONS) {
-                    // The button is the tuner, so it stands just off the side of the head.
-                    (frame.edge(peg[i].y, side) + side * (20f * geo.unit + diameter / 2f))
-                        .coerceIn(near, width - near)
-                } else {
-                    if (side < 0f) near else width - near
-                }
+                val px = if (peg[i].x < centre) diameter / 2f + 2f * dp else width - diameter / 2f - 2f * dp
                 Offset(px, bubbleY[i])
             }
             return BoardLayout(geo, width, height, dp, bubbles, diameter)
@@ -314,7 +286,6 @@ private fun StringBubble(
     isTuned: Boolean,
     isInTune: Boolean,
     isSounding: Boolean,
-    style: HeadStyle,
     activeColor: Color,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
@@ -324,15 +295,11 @@ private fun StringBubble(
     val scheme = MaterialTheme.colorScheme
     val signals = LocalTunerSignals.current
 
-    val buttons = style == HeadStyle.BUTTONS
     val container by animateColorAsState(
         targetValue = when {
             isInTune -> signals.inTune
             isActive -> activeColor
-            // On a tuner button a see through green would let its own stem shine through.
-            isTuned -> if (buttons) signals.inTune else signals.inTune.copy(alpha = 0.22f)
-            buttons -> scheme.tertiary
-            style == HeadStyle.BLOCKS -> scheme.secondaryContainer
+            isTuned -> signals.inTune.copy(alpha = 0.22f)
             else -> scheme.surfaceContainerHighest
         },
         animationSpec = TunerMotion.colourSpec(),
@@ -341,9 +308,7 @@ private fun StringBubble(
     val content by animateColorAsState(
         targetValue = when {
             isInTune || isActive -> signals.onSignal
-            isTuned -> if (buttons) signals.onSignal else signals.inTune
-            buttons -> scheme.onTertiary
-            style == HeadStyle.BLOCKS -> scheme.onSecondaryContainer
+            isTuned -> signals.inTune
             else -> scheme.onSurface
         },
         animationSpec = TunerMotion.colourSpec(),
@@ -380,7 +345,7 @@ private fun StringBubble(
             color = content,
         )
         AnimatedVisibility(
-            visible = isTuned && !isInTune && !buttons,
+            visible = isTuned && !isInTune && !isActive,
             enter = scaleIn(TunerMotion.springy()) + fadeIn(),
             exit = scaleOut() + fadeOut(),
             modifier = Modifier.align(Alignment.TopEnd),

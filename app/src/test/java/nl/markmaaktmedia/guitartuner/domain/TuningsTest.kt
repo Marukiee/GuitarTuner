@@ -75,12 +75,10 @@ class TuningsTest {
 
     @Test
     fun `each instrument is visually distinguishable from the others`() {
-        // The complaint that started this: a picker where every entry drew the same head.
-        // Layout plus string count is what the silhouette is built from, so no two
-        // instruments may share both.
-        val signatures = Instrument.entries.map {
-            Triple(it.layout, it.defaultTuning.stringCount, it.headstockScale)
-        }
+        // The complaint that started this: a picker where every entry drew the same picture.
+        // The icon is built from the figure, its size and its badge, so no two instruments
+        // may share all three.
+        val signatures = Instrument.entries.map { Triple(it.silhouette, it.size, it.badge) }
         assertEquals(signatures.size, signatures.toSet().size)
     }
 }
