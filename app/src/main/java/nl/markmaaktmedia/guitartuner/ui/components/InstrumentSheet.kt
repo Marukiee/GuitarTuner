@@ -62,8 +62,6 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.LayoutCoordinates
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
@@ -113,8 +111,11 @@ fun InstrumentSheet(
     onInstrument: (Instrument) -> Unit,
     onTuning: (Tuning) -> Unit,
     onDismiss: () -> Unit,
-    /** The bar it comes out of, with the radius of its round end and of its cut end. */
-    bar: LayoutCoordinates?,
+    /**
+     * Where the bar it comes out of is, on the screen this covers, with the radius of its round end
+     * and of its cut end. It follows the bar, which an arriving update card pushes down.
+     */
+    bar: Rect?,
     barOuter: Dp,
     barInner: Dp,
     /** 0 is the bar itself, 1 the whole panel. The caller owns it, to hide the bar meanwhile. */
@@ -130,21 +131,11 @@ fun InstrumentSheet(
         if (index >= 0) listState.animateScrollToItem(index)
     }
 
-    // Where this overlay is, and from that where the bar is within it.
-    var overlay by remember { mutableStateOf<LayoutCoordinates?>(null) }
-    val anchor = remember(overlay, bar) {
-        val here = overlay
-        if (here != null && here.isAttached && bar != null && bar.isAttached) {
-            here.localBoundingBoxOf(bar, clipBounds = false)
-        } else {
-            null
-        }
-    }
     val back = remember { Animatable(0f) }
     var closing by remember { mutableStateOf(false) }
 
-    LaunchedEffect(anchor != null) {
-        if (anchor != null && !closing) {
+    LaunchedEffect(bar != null) {
+        if (bar != null && !closing) {
             view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
             open.animateTo(1f, tween(OpenMillis, easing = TunerMotion.Emphasised))
         }
@@ -169,7 +160,7 @@ fun InstrumentSheet(
         }
     }
 
-    BoxWithConstraints(Modifier.fillMaxSize().onGloballyPositioned { overlay = it }) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
         Box(
             Modifier
                 .fillMaxSize()
@@ -177,7 +168,7 @@ fun InstrumentSheet(
                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { close() },
         )
 
-        if (anchor == null) return@BoxWithConstraints
+        val anchor = bar ?: return@BoxWithConstraints
         val density = LocalDensity.current
         val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
         // The panel keeps the same distance to both sides of the screen as the bar does to its own.

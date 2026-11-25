@@ -28,9 +28,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
@@ -66,11 +68,12 @@ fun TunerScreen(
     var showPicker by rememberSaveable { mutableStateOf(false) }
     // How far the instrument panel is out of its bar.
     val picker = remember { Animatable(0f) }
-    var bar by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    var screen by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    var bar by remember { mutableStateOf<Rect?>(null) }
     // Another instrument's head fades in rather than snapping into place.
     val boardFade = rememberFadeIn(state.instrument)
 
-    Box(Modifier.fillMaxSize()) {
+    Box(Modifier.fillMaxSize().onPlaced { screen = it }) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -88,7 +91,8 @@ fun TunerScreen(
                 onOpenSettings = onOpenSettings,
                 // Gone once the panel has taken over from it, so it cannot peek out from behind.
                 barModifier = Modifier
-                    .onGloballyPositioned { bar = it }
+                    // Measured against this screen, so a page sliding over it changes nothing.
+                    .onGloballyPositioned { here -> bar = screen?.localBoundingBoxOf(here, clipBounds = false) }
                     .graphicsLayer { alpha = if (picker.value < HandOver) 1f else 0f },
             )
 
